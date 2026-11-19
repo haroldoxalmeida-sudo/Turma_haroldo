@@ -267,6 +267,17 @@ const Aluno = {
   barra(pct, txt) { return `<div class="pbar"><div style="width:${pct}%"></div></div>${txt ? `<div class="ptxt">${txt}</div>` : ''}` },
   vencimento() {
     const m = this.trilha.mat; if (!m.vence_em) return '';
+    const d = diasAte(m.vence_em), urg = d <= 5, ab = this.renovarAberto || urg;
+    const tz = encodeURIComponent('Oi Haroldo! Fiz o Pix da renovação da Turma (' + usuario.email + '). Segue o comprovante:');
+    return `<div class="assin ${urg ? 'urg' : ''}"><button class="assin-h" id="bRenovar">
+      <span class="assin-ic">${urg ? '⏰' : '✅'}</span><div style="flex:1;text-align:left"><b>${urg ? (d === 0 ? 'Sua assinatura vence hoje' : `Sua assinatura vence em ${d} dia${d > 1 ? 's' : ''}`) : 'Assinatura ativa'}</b><small>válida até ${dataLocal(m.vence_em).toLocaleDateString('pt-BR')}${urg ? '' : ` · faltam ${d} dias`}</small></div>
+      <span class="assin-btn">${ab ? 'Fechar' : 'Renovar'}</span></button>
+      ${ab ? `<div class="assin-c">${cfg.chave_pix ? `<div>Renove com Pix (${esc(cfg.valor_mensal || '')}):</div><div class="pix"><code>${esc(cfg.chave_pix)}</code><button class="dl" data-copia="${esc(cfg.chave_pix)}">Copiar Pix</button></div>${cfg.nome_pix ? `<div class="wd">Nome: ${esc(cfg.nome_pix)}</div>` : ''}` : '<div>Fale com o Haroldo para receber os dados do Pix.</div>'}
+        <a class="wa" href="https://wa.me/${esc(cfg.whatsapp || '5565996818656')}?text=${tz}" target="_blank" rel="noopener">Enviar comprovante no WhatsApp</a>
+        <div class="wd" style="margin-top:6px">Assim que o Haroldo confirmar, sua assinatura ganha mais 30 dias.</div></div>` : ''}</div>`;
+  },
+  vencimentoAntigo() {
+    const m = this.trilha.mat; if (!m.vence_em) return '';
     const d = diasAte(m.vence_em); if (d > 3) return '';
     const quando = d === 0 ? '<b>vence hoje</b>' : `vence em <b>${d} dia${d > 1 ? 's' : ''}</b> (${fmt(dataLocal(m.vence_em))})`;
     return `<div class="alerta venc">⏰ Sua mensalidade ${quando}. Renove para não perder o acesso.
@@ -377,6 +388,7 @@ const Aluno = {
     c.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k = b.dataset.toggle; this.abertas[k] = !(this.abertas[k] ?? (this.aba === 'materiais' && this.d.semanas.filter(s => s.aberta).slice(-1)[0]?.id === k)); this.render() });
     c.querySelectorAll('[data-topico]').forEach(b => b.onclick = () => this.alternarTopico(b.dataset.topico, b));
     if ($('buscaLei')) $('buscaLei').oninput = e => { const q = e.target.value.toLowerCase().trim(); c.querySelectorAll('.lei').forEach(x => x.style.display = !q || x.dataset.busca.includes(q) ? '' : 'none'); c.querySelectorAll('.lgrupo').forEach(g => g.style.display = [...g.querySelectorAll('.lei')].some(x => x.style.display !== 'none') ? '' : 'none') };
+    if ($('bRenovar')) $('bRenovar').onclick = () => { this.renovarAberto = !this.renovarAberto; this.render() };
     if ($('bFecharExp')) $('bFecharExp').onclick = () => { ls.set('comoFunciona', '1'); this.render() };
     if ($('bSenha')) $('bSenha').onclick = async () => { const s = $('novaSenha').value; if (s.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.'); return } const { error } = await sb.auth.updateUser({ password: s }); toast(error ? 'Erro: ' + error.message : 'Senha alterada!'); $('novaSenha').value = '' };
     if ($('bSair2')) $('bSair2').onclick = () => sb.auth.signOut();

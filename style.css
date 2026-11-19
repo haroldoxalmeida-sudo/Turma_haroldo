@@ -74,8 +74,8 @@ button{font-family:inherit}
 .alerta{border-radius:14px;padding:14px 16px;margin-bottom:12px;font-size:13px;line-height:1.55}
 .alerta.venc{background:var(--goldl);border:1px solid var(--gold);color:#633806}
 .alerta.venc b{color:var(--navy)}
-.alerta .pix{display:flex;gap:8px;align-items:center;margin-top:8px;background:#fff;border-radius:8px;padding:8px 10px;border:1px dashed var(--gold)}
-.alerta .pix code{flex:1;font-size:12px;word-break:break-all}
+.alerta .pix,.assin .pix{display:flex;gap:8px;align-items:center;margin-top:8px;background:#fff;border-radius:8px;padding:8px 10px;border:1px dashed var(--gold)}
+.alerta .pix code,.assin .pix code{flex:1;font-size:12px;word-break:break-all}
 .aviso{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:0 12px 12px 0;padding:12px 14px;margin-bottom:10px}
 .aviso h4{font-size:14px;color:var(--navy);margin-bottom:3px}
 .aviso p{font-size:13px;color:var(--grey);line-height:1.5;white-space:pre-line}
@@ -228,3 +228,12 @@ a.dl{text-decoration:none;display:inline-block}
 .qtexto{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:12px}
 .qtexto summary{font-weight:600;color:var(--navy);cursor:pointer;font-size:13px}
 .qtexto div{white-space:pre-line;font-size:14px;line-height:1.6;margin-top:8px;color:var(--ink)}
+.assin{background:#fff;border:1px solid #BFE3CF;border-radius:14px;margin-bottom:12px;overflow:hidden}
+.assin.urg{border:2px solid var(--gold);background:var(--goldl)}
+.assin-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:12px 14px;cursor:pointer;font-family:inherit}
+.assin-h b{display:block;font-size:14px;color:var(--navy)}.assin-h small{font-size:12px;color:var(--grey)}
+.assin-ic{font-size:22px}
+.assin-btn{background:var(--navy);color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600}
+.assin.urg .assin-btn{background:var(--gold);color:var(--navy)}
+.assin-c{padding:0 14px 14px;font-size:13px;color:var(--navy2)}
+.assin-c .wa{display:block;text-align:center}
