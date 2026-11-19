@@ -105,6 +105,8 @@ const CAT = {
   questoes: ['✍️', 'Questões comentadas'], flashcards: ['🃏', 'Flashcards'], simulado: ['🏆', 'Simulado'], extra: ['📎', 'Material extra']
 };
 const ORDEM_CAT = ['aula', 'legislacao', 'mapa', 'questoes', 'flashcards', 'simulado', 'extra'];
+const EXTRAS = ['mapa', 'extra'];
+const DIA_NOME = { 6: 'Simulado da semana' };
 const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { localStorage.setItem(k, v) } catch { } } };
 
 function cartaoInstalar() {
@@ -150,12 +152,13 @@ const Aluno = {
 
   async carregar() {
     const t = this.trilha;
-    const [sem, mt, av, pm, ed] = await Promise.all([
+    const [sem, mt, av, pm, ed, lei] = await Promise.all([
       sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id', t.id).order('numero'),
-      sb.from('materiais').select('id,semana_id,titulo,categoria,ordem,storage_path').order('ordem'),
+      sb.from('materiais').select('id,semana_id,titulo,categoria,ordem,storage_path,dia,disciplina').order('ordem'),
       sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(10),
       sb.from('progresso_materiais').select('material_id,concluido_em').eq('user_id', usuario.id),
-      sb.from('editais').select('id,nome,data_prova').eq('trilha_id', t.id).limit(1).maybeSingle()
+      sb.from('editais').select('id,nome,data_prova').eq('trilha_id', t.id).limit(1).maybeSingle(),
+      sb.from('leis').select('id,grupo,nome,numero,url_oficial,ordem,conferida_em').or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('ordem')
     ]);
     const ini = dataLocal(t.mat.inicio), h = hoje();
     const feitos = new Set((pm.data || []).map(x => x.material_id));
@@ -163,8 +166,9 @@ const Aluno = {
       const lib = addDias(ini, s.dias_para_liberar);
       const itens = (mt.data || []).filter(m => m.semana_id === s.id).sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
       const aberta = h >= lib;
-      const feitosN = itens.filter(i => feitos.has(i.id)).length;
-      return { ...s, lib, aberta, itens, feitosN, concluida: aberta && itens.length > 0 && feitosN === itens.length };
+      const conta = itens.filter(i => !EXTRAS.includes(i.categoria));
+      const feitosN = conta.filter(i => feitos.has(i.id)).length;
+      return { ...s, lib, aberta, itens, conta, feitosN, concluida: aberta && conta.length > 0 && feitosN === conta.length };
     });
     let edital = null;
     if (ed.data) {
@@ -194,7 +198,7 @@ const Aluno = {
     const prox = new Map((rv.data || []).map(r => [r.card_id, r.proxima]));
     const hojeIso = iso(hoje());
     const devidos = (fc.data || []).filter(c => !prox.has(c.id) || prox.get(c.id) <= hojeIso);
-    this.d = { semanas, avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds };
+    this.d = { semanas, leis: lei.data || [], avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds };
   },
 
   ir(aba) { this.aba = aba; history.replaceState(null, '', '#a-' + aba); this.render(); window.scrollTo(0, 0) },
@@ -205,7 +209,7 @@ const Aluno = {
     this.atual = abertas[abertas.length - 1] || null;
     $('nav').classList.remove('hidden');
     $('nav').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.nav === this.aba));
-    const titulos = { inicio: 'Sua semana de estudos', materiais: 'Seus materiais', edital: 'Edital vivo', conta: 'Minha conta' };
+    const titulos = { inicio: 'Sua semana de estudos', materiais: 'Seus materiais', edital: 'Edital vivo', conta: 'Minha conta', leis: 'Legislação' };
     $('ttl').textContent = titulos[this.aba];
     $('prog').classList.add('hidden');
     const c = $('conteudo');
@@ -215,14 +219,50 @@ const Aluno = {
   },
 
   // --- componentes
-  item(i) {
+  item(i, mapa) {
     const [ic, nome] = CAT[i.categoria] || CAT.extra, feito = this.d.feitos.has(i.id);
     return `<div class="item ${feito ? 'feito' : ''}">
       <button class="chk" data-feito="${i.id}" aria-label="Marcar como concluído">${feito ? '✓' : ''}</button>
       <div class="itx"><div class="icat">${ic} ${nome}</div><div class="inm">${esc(i.titulo)}</div></div>
       <div class="mb">${!i.storage_path && (i.categoria === 'questoes' || i.categoria === 'flashcards')
         ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : 'Praticar'}</button>`
-        : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button>`}</div></div>`;
+        : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button>`}</div></div>
+      ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span><button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" aria-label="Baixar">⬇</button></div>` : ''}`;
+  },
+  // semana organizada em dias, com 2 disciplinas por dia
+  dias(s) {
+    const temDia = s.itens.some(i => i.dia);
+    if (!temDia) return s.itens.map(i => this.item(i)).join('');
+    const fe = this.d.feitos, html = [];
+    const prox = this.proxDia(s);
+    for (let d = 1; d <= 6; d++) {
+      const its = s.itens.filter(i => i.dia === d);
+      const conta = its.filter(i => !EXTRAS.includes(i.categoria));
+      const discs = [...new Set(its.map(i => i.disciplina || 'Geral'))];
+      const ok = conta.length && conta.every(i => fe.has(i.id));
+      const nomeDia = discs.length && its.length ? discs.join(' + ') : (DIA_NOME[d] || 'Em preparação');
+      const k = 'd' + s.id + d, aberto = this.abertas[k] ?? (d === prox);
+      let corpo = '';
+      if (aberto) {
+        if (!its.length) corpo = '<div class="wd" style="margin-top:8px">📦 O material deste dia está sendo preparado.</div>';
+        else corpo = `<div class="rot">⏱ 4h · 15 min de revisão + 2 disciplinas (aula + questões)</div>` + discs.map(dn => {
+          const di = its.filter(i => (i.disciplina || 'Geral') === dn);
+          const mapas = di.filter(i => i.categoria === 'mapa');
+          const princ = di.filter(i => i.categoria !== 'mapa').sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
+          let usado = false;
+          return `<div class="disc-h">${esc(dn)}</div>` + princ.map(i => { const m = !usado && i.categoria === 'aula' ? mapas[0] : null; if (m) usado = true; return this.item(i, m) }).join('') + (!usado ? mapas.map(m => this.item(m)).join('') : '');
+        }).join('');
+      }
+      html.push(`<div class="dia ${ok ? 'ok' : ''} ${d === prox ? 'hoje' : ''}"><button class="btnhead" data-toggle="${k}">
+        <div class="ddot">${ok ? '✓' : d}</div><div style="flex:1;text-align:left"><div class="dlbl">Dia ${d}</div><div class="dnm">${esc(nomeDia)}</div></div>${d === prox && !ok ? '<span class="tag new">hoje</span>' : ''}<span class="seta">${aberto ? '▴' : '▾'}</span></button>${corpo}</div>`);
+    }
+    const sem = s.itens.filter(i => !i.dia);
+    if (sem.length) html.push(`<div class="disc-h">Extras da semana</div>` + sem.map(i => this.item(i)).join(''));
+    return html.join('');
+  },
+  proxDia(s) {
+    for (let d = 1; d <= 6; d++) { const c = s.itens.filter(i => i.dia === d && !EXTRAS.includes(i.categoria)); if (c.length && !c.every(i => this.d.feitos.has(i.id))) return d }
+    return 0;
   },
   barra(pct, txt) { return `<div class="pbar"><div style="width:${pct}%"></div></div>${txt ? `<div class="ptxt">${txt}</div>` : ''}` },
   vencimento() {
@@ -238,8 +278,9 @@ const Aluno = {
     const { semanas, avisos, edital } = this.d, a = this.atual, h = hoje();
     let html = this.vencimento();
     if (!ls.get('comoFunciona')) html += `<div class="explica"><button class="x" id="bFecharExp" aria-label="Fechar">×</button><b>Como funciona a Turma</b>
-      <ol><li>Toda semana libera um <b>pacote novo</b>: aula completa, legislação, mapa mental, questões e flashcards.</li>
-      <li>Estude e toque no <b>círculo</b> de cada item para marcar como concluído.</li>
+      <ol><li>Toda semana libera um <b>pacote novo</b>, dividido em <b>6 dias</b> de 4h, com 2 disciplinas por dia.</li>
+      <li>Em cada dia: <b>revisão</b> (flashcards), <b>Aula Completa</b> (teoria + lei seca) e <b>questões</b>. O mapa mental é extra.</li>
+      <li>Toque no <b>círculo</b> de cada item para marcar como concluído.</li>
       <li>Ao concluir a semana, os assuntos são marcados no seu <b>Edital vivo</b>.</li>
       <li>Os <b>cadeados</b> mostram o que vem pela frente e quando chega.</li></ol></div>`;
     const stats = [];
@@ -252,11 +293,11 @@ const Aluno = {
       ${revisar || novos ? `<button class="atalho a1" data-jogo="flashcards" data-sem="todas"><span>🃏</span><div><b>Revisão do dia</b><small>${revisar ? revisar + ' card' + (revisar > 1 ? 's' : '') + ' para revisar' : ''}${revisar && novos ? ' · ' : ''}${novos ? novos + ' novo' + (novos > 1 ? 's' : '') : ''}</small></div></button>` : ''}
       ${erros ? `<button class="atalho a2" data-jogo="erros" data-sem="todas"><span>📕</span><div><b>Caderno de erros</b><small>${erros} questão${erros > 1 ? 'ões' : ''} para refazer</small></div></button>` : ''}</div>`;
     if (a) {
-      const pct = a.itens.length ? Math.round(a.feitosN / a.itens.length * 100) : 0;
+      const pct = a.conta.length ? Math.round(a.feitosN / a.conta.length * 100) : 0;
       html += `<div class="sec">Estude esta semana</div><div class="card now semana">
         <div class="shead"><div class="dot">${a.numero}</div><div style="flex:1"><div class="wt">Semana ${a.numero} · ${esc(a.titulo)}</div>${a.descricao ? `<div class="wd">${esc(a.descricao)}</div>` : ''}</div>${a.concluida ? '<span class="tag okk">concluída</span>' : ''}</div>
-        ${a.itens.length ? this.barra(pct, `${a.feitosN} de ${a.itens.length} itens concluídos`) + a.itens.map(i => this.item(i)).join('') : '<div class="wd" style="margin-top:8px">O material desta semana está sendo preparado. Fique de olho no mural!</div>'}</div>`;
-      const pend = semanas.filter(s => s.aberta && s !== a && !s.concluida && s.itens.length);
+        ${a.itens.length ? this.barra(pct, `${a.feitosN} de ${a.conta.length} itens concluídos`) + this.dias(a) : '<div class="wd" style="margin-top:8px">O material desta semana está sendo preparado. Fique de olho no mural!</div>'}</div>`;
+      const pend = semanas.filter(s => s.aberta && s !== a && !s.concluida && s.conta.length);
       if (pend.length) html += `<div class="alerta pend">📌 Você tem ${pend.length} semana${pend.length > 1 ? 's' : ''} anterior${pend.length > 1 ? 'es' : ''} com itens pendentes. <button class="lnk" data-ir="materiais">Ver materiais ›</button></div>`;
     }
     const prox = semanas.filter(s => !s.aberta).slice(0, 3);
@@ -276,8 +317,8 @@ const Aluno = {
       if (this.filtro !== 'todos' && !itens.length) return '';
       const aberto = this.abertas[s.id] ?? (idx === 0);
       return `<div class="card ${s === this.atual ? 'now' : s.concluida ? 'ok' : ''} semana"><button class="shead btnhead" data-toggle="${s.id}">
-        <div class="dot">${s.concluida ? '✓' : s.numero}</div><div style="flex:1;text-align:left"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${s.feitosN}/${s.itens.length} concluídos</div></div><span class="seta">${aberto ? '▴' : '▾'}</span></button>
-        ${aberto ? (itens.length ? itens.map(i => this.item(i)).join('') : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : ''}</div>`;
+        <div class="dot">${s.concluida ? '✓' : s.numero}</div><div style="flex:1;text-align:left"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${s.feitosN}/${s.conta.length} concluídos</div></div><span class="seta">${aberto ? '▴' : '▾'}</span></button>
+        ${aberto ? (itens.length ? (this.filtro === 'todos' ? this.dias(s) : itens.map(i => this.item(i)).join('')) : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : ''}</div>`;
     }).join('');
     const bloq = this.d.semanas.filter(s => !s.aberta).length;
     if (bloq) html += `<div class="wd" style="text-align:center;margin:10px">🔒 Mais ${bloq} semana${bloq > 1 ? 's' : ''} chegando. Veja as datas no Início.</div>`;
@@ -296,6 +337,18 @@ const Aluno = {
         ${aberto ? `<div class="tops">${d.tops.map(t => `<button class="etop ${t.auto || t.manual ? 'ok' : ''} ${t.auto ? 'auto' : ''}" data-topico="${t.id}" ${t.auto ? 'disabled' : ''}><span class="chk sm">${t.auto || t.manual ? '✓' : ''}</span><span>${esc(t.texto)}${t.auto ? ' <em>(pela trilha)</em>' : ''}</span></button>`).join('')}</div>` : ''}</div>`;
     }).join('');
     return html;
+  },
+
+  tela_leis() {
+    const L = this.d.leis;
+    if (!L.length) return `<div class="empty card"><h3>⚖️ Legislação</h3><p>Em breve aqui você vai encontrar todas as leis do seu edital.</p></div>`;
+    const grupos = [...new Set(L.map(l => l.grupo))];
+    return `<div class="explica" style="margin-bottom:10px"><b>Lei seca completa do edital</b><br>Na Aula Completa você estuda os artigos de cada assunto. Aqui fica a lei inteira, sempre pelo texto oficial e atualizado.</div>
+      <div class="pf"><input id="buscaLei" placeholder="🔎 Buscar lei (ex.: drogas, 11.343, Maria da Penha)" autocomplete="off"></div>
+      ${grupos.map(g => `<div class="lgrupo"><div class="sec">${esc(g)}</div><div class="card">${L.filter(l => l.grupo === g).map(l => `<div class="lei" data-busca="${esc((l.nome + ' ' + (l.numero || '') + ' ' + g).toLowerCase())}">
+        <div style="flex:1"><div class="inm">${esc(l.nome)}</div><div class="wd">${esc(l.numero || '')}${l.conferida_em ? ' · conferida em ' + dataLocal(l.conferida_em).toLocaleDateString('pt-BR') : ''}</div></div>
+        ${l.url_oficial ? `<a class="dl" href="${esc(l.url_oficial)}" target="_blank" rel="noopener">Ler ↗</a>` : '<span class="tag">em breve</span>'}</div>`).join('')}</div></div>`).join('')}
+      <div class="wd" style="text-align:center;margin:10px">Texto oficial do Planalto, sempre na versão atualizada.</div>`;
   },
 
   tela_conta() {
@@ -323,6 +376,7 @@ const Aluno = {
     c.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { this.filtro = b.dataset.filtro; this.render() });
     c.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k = b.dataset.toggle; this.abertas[k] = !(this.abertas[k] ?? (this.aba === 'materiais' && this.d.semanas.filter(s => s.aberta).slice(-1)[0]?.id === k)); this.render() });
     c.querySelectorAll('[data-topico]').forEach(b => b.onclick = () => this.alternarTopico(b.dataset.topico, b));
+    if ($('buscaLei')) $('buscaLei').oninput = e => { const q = e.target.value.toLowerCase().trim(); c.querySelectorAll('.lei').forEach(x => x.style.display = !q || x.dataset.busca.includes(q) ? '' : 'none'); c.querySelectorAll('.lgrupo').forEach(g => g.style.display = [...g.querySelectorAll('.lei')].some(x => x.style.display !== 'none') ? '' : 'none') };
     if ($('bFecharExp')) $('bFecharExp').onclick = () => { ls.set('comoFunciona', '1'); this.render() };
     if ($('bSenha')) $('bSenha').onclick = async () => { const s = $('novaSenha').value; if (s.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.'); return } const { error } = await sb.auth.updateUser({ password: s }); toast(error ? 'Erro: ' + error.message : 'Senha alterada!'); $('novaSenha').value = '' };
     if ($('bSair2')) $('bSair2').onclick = () => sb.auth.signOut();
@@ -518,8 +572,8 @@ const Painel = {
     const prox = (ss.length ? Math.max(...ss.map(s => s.numero)) : 0) + 1;
     $('pBody').innerHTML = `<div class="card pf"><label style="margin-top:0">Trilha</label><select id="mTri">${this.opcoesTrilha(this.trilhaSel)}</select></div>
       ${ss.map(s => `<div class="card"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${esc(s.descricao || '')} · libera ${s.dias_para_liberar} dias após a entrada</div>
-        ${materiais.filter(m => m.semana_id === s.id).map(m => `<div class="mt"><span>${(CAT[m.categoria] || CAT.extra)[0]} ${esc(m.titulo)}</span><button class="dl red" data-rmat="${m.id}" data-path="${esc(m.storage_path)}">Remover</button></div>`).join('') || '<div class="wd" style="margin-top:6px">Sem PDF ainda.</div>'}
-        <div class="pf"><label>Enviar PDF para esta semana</label><input type="file" accept="application/pdf" data-arq="${s.id}"><select data-cat="${s.id}" style="margin-top:6px">${ORDEM_CAT.map(k => `<option value="${k}">${CAT[k][0]} ${CAT[k][1]}</option>`).join('')}</select><input placeholder="Nome do material (ex.: Lei de Drogas esquematizada)" data-tit="${s.id}" style="margin-top:6px"><button class="btn" data-up="${s.id}" data-num="${s.numero}">Enviar PDF</button></div></div>`).join('')}
+        ${materiais.filter(m => m.semana_id === s.id).map(m => `<div class="mt"><span>${(CAT[m.categoria] || CAT.extra)[0]} ${m.dia ? '<b>D' + m.dia + '</b> ' : ''}${esc(m.titulo)}</span><button class="dl red" data-rmat="${m.id}" data-path="${esc(m.storage_path)}">Remover</button></div>`).join('') || '<div class="wd" style="margin-top:6px">Sem PDF ainda.</div>'}
+        <div class="pf"><label>Enviar PDF para esta semana</label><input type="file" accept="application/pdf" data-arq="${s.id}"><select data-cat="${s.id}" style="margin-top:6px">${ORDEM_CAT.map(k => `<option value="${k}">${CAT[k][0]} ${CAT[k][1]}</option>`).join('')}</select><input placeholder="Nome do material (ex.: Lei de Drogas esquematizada)" data-tit="${s.id}" style="margin-top:6px"><select data-dia="${s.id}" style="margin-top:6px"><option value="">Dia: sem dia (extra da semana)</option>${[1,2,3,4,5,6].map(d => `<option value="${d}">Dia ${d}</option>`).join('')}</select><input placeholder="Disciplina (ex.: Direito Penal)" data-disc="${s.id}" list="listaDisc" style="margin-top:6px"><datalist id="listaDisc">${['Direito Penal','Processo Penal','Direito Constitucional','Direito Administrativo','Português','Informática','Legislação Penal Especial','Raciocínio Lógico','Estatuto PJC-MT','Ética e Filosofia','História e Geografia de MT'].map(x => `<option value="${x}">`).join('')}</datalist><button class="btn" data-up="${s.id}" data-num="${s.numero}">Enviar PDF</button></div></div>`).join('')}
       <div class="card pf"><div class="wt">Nova semana</div>
         <label>Número</label><input id="sNum" type="number" value="${prox}">
         <label>Título</label><input id="sTit" placeholder="Ex.: Organização Criminosa">
@@ -551,7 +605,8 @@ const Painel = {
     const up = await sb.storage.from('materiais').upload(caminho, arq, { contentType: 'application/pdf' });
     if (up.error) { toast('Erro no envio: ' + up.error.message); b.disabled = false; b.textContent = 'Enviar PDF'; return }
     const categoria = document.querySelector(`[data-cat="${sid}"]`).value;
-    const r = await sb.from('materiais').insert({ semana_id: sid, titulo, storage_path: caminho, categoria });
+    const dia = Number(document.querySelector(`[data-dia="${sid}"]`).value) || null, disciplina = document.querySelector(`[data-disc="${sid}"]`).value.trim() || null;
+    const r = await sb.from('materiais').insert({ semana_id: sid, titulo, storage_path: caminho, categoria, dia, disciplina });
     toast(r.error ? 'Erro: ' + r.error.message : 'PDF publicado!'); this.render();
   },
 
