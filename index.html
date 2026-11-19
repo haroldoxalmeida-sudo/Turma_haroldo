@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Turma Haroldo Concurso</title>
+<meta name="theme-color" content="#14243F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#14243F;--navy2:#22365F;--gold:#C9A24A;--goldl:#FBF3E0;--ink:#1E2430;--grey:#5B6475;--bg:#F3F5F9;--line:#D9DEE8;--green:#1E7A4F;--red:#B3261E}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Poppins,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.wrap{max-width:560px;margin:0 auto;padding:0 0 40px}
+.hidden{display:none!important}
+/* login */
+.auth{min-height:100vh;background:var(--navy);color:#fff;padding:48px 24px;display:flex;flex-direction:column;justify-content:center}
+.kicker{font-size:12px;letter-spacing:2px;color:var(--gold);font-weight:600}
+.brand{font-size:28px;font-weight:700;margin:8px 0 4px}
+.sub{color:#C8D1E3;font-size:14px;margin-bottom:28px}
+.tabs{display:flex;background:var(--navy2);border-radius:10px;padding:4px;margin-bottom:18px}
+.tabs button{flex:1;border:0;background:transparent;color:#C8D1E3;padding:10px;border-radius:8px;font:500 14px Poppins;cursor:pointer}
+.tabs button.on{background:var(--gold);color:var(--navy)}
+label{display:block;font-size:12px;color:#C8D1E3;margin:12px 0 6px}
+input{width:100%;padding:13px 14px;border-radius:10px;border:1px solid #2E4573;background:var(--navy2);color:#fff;font:15px Poppins;outline:none}
+input:focus{border-color:var(--gold)}
+.btn{width:100%;margin-top:20px;padding:14px;border:0;border-radius:10px;background:var(--gold);color:var(--navy);font:600 15px Poppins;cursor:pointer}
+.btn:disabled{opacity:.6}
+.msg{margin-top:14px;font-size:13px;min-height:18px}
+.msg.err{color:#FFB4AB}.msg.ok{color:#9BE0BC}
+.link{background:none;border:0;color:var(--gold);font:500 13px Poppins;margin-top:14px;cursor:pointer;text-decoration:underline}
+.foot{margin-top:36px;font-size:12px;color:#8FA0C0;text-align:center}
+/* app */
+.top{background:var(--navy);color:#fff;padding:20px 20px 22px;border-radius:0 0 22px 22px}
+.toprow{display:flex;justify-content:space-between;align-items:center}
+.hello{font-size:13px;color:var(--gold);font-weight:500}
+.ttl{font-size:20px;font-weight:600;margin-top:2px}
+.out{background:transparent;border:1px solid #2E4573;color:#C8D1E3;border-radius:8px;padding:7px 12px;font:500 12px Poppins;cursor:pointer}
+.prog{margin-top:16px}
+.prog small{font-size:12px;color:#C8D1E3}
+.bar{height:8px;background:#2E4573;border-radius:6px;margin-top:6px;overflow:hidden}
+.bar div{height:8px;background:var(--gold);border-radius:6px;transition:width .6s}
+.content{padding:18px 16px}
+.sec{font-size:13px;font-weight:600;color:var(--grey);margin:6px 4px 10px;letter-spacing:.5px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.trilha{cursor:pointer;display:flex;align-items:center;gap:14px}
+.ic{width:44px;height:44px;border-radius:12px;background:var(--navy);color:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.week{display:flex;gap:12px;align-items:flex-start}
+.dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.ok .dot{background:#E7F5EE;color:var(--green)}
+.now{border:2px solid var(--gold);background:var(--goldl)}
+.now .dot{background:var(--gold);color:var(--navy)}
+.lock{background:#ECEFF4;border-color:#ECEFF4}
+.lock .dot{background:#DDE2EA;color:#8A93A3}
+.wt{font-weight:600;font-size:15px;color:var(--navy)}
+.lock .wt{color:var(--grey)}
+.wd{font-size:13px;color:var(--grey);margin-top:2px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-left:6px;vertical-align:2px}
+.tag.new{background:var(--gold);color:var(--navy)}
+.tag.soon{background:#DDE2EA;color:var(--grey)}
+.mat{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 12px;border-radius:10px;background:#F6F8FB;border:1px solid var(--line)}
+.ok .mat,.now .mat{background:#fff}
+.mat span{font-size:13px;font-weight:500}
+.dl{border:0;background:var(--navy);color:#fff;border-radius:8px;padding:8px 12px;font:600 12px Poppins;cursor:pointer;white-space:nowrap}
+.empty{text-align:center;padding:36px 20px}
+.empty h3{color:var(--navy);margin-bottom:8px}
+.empty p{color:var(--grey);font-size:14px;line-height:1.6}
+.wa{display:inline-block;margin-top:18px;background:#1E7A4F;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:600;font-size:14px}
+.back{background:none;border:0;color:var(--gold);font:500 13px Poppins;cursor:pointer;margin-bottom:6px}
+.spin{text-align:center;color:var(--grey);padding:40px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- LOGIN -->
+  <section id="auth" class="auth">
+    <div class="kicker">TURMA CARREIRAS POLICIAIS</div>
+    <div class="brand">Haroldo Concurso</div>
+    <div class="sub">Entre para acessar o seu material</div>
+    <div class="tabs"><button id="tEntrar" class="on">Entrar</button><button id="tCriar">Criar conta</button></div>
+    <form id="fAuth">
+      <div id="campos-cad" class="hidden">
+        <label>Nome completo</label><input id="nome" autocomplete="name">
+        <label>WhatsApp</label><input id="whats" inputmode="tel" placeholder="(65) 99999-9999">
+      </div>
+      <label>E-mail</label><input id="email" type="email" autocomplete="email" required>
+      <label>Senha</label><input id="senha" type="password" autocomplete="current-password" minlength="6" required>
+      <button class="btn" id="bAuth" type="submit">Entrar</button>
+      <div class="msg" id="mAuth"></div>
+    </form>
+    <button class="link" id="bEsqueci">Esqueci minha senha</button>
+    <div class="foot">Dúvidas? WhatsApp (65) 99681-8656 · @haroldoconcurso</div>
+  </section>
+
+  <!-- APP -->
+  <section id="app" class="hidden">
+    <div class="top">
+      <div class="toprow">
+        <div><div class="hello" id="hello">Olá</div><div class="ttl" id="ttl">Suas trilhas</div></div>
+        <button class="out" id="bSair">Sair</button>
+      </div>
+      <div class="prog hidden" id="prog"><small id="progTxt"></small><div class="bar"><div id="progBar" style="width:0"></div></div></div>
+    </div>
+    <div class="content" id="conteudo"><div class="spin">Carregando…</div></div>
+  </section>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://ewwuryyxuclzbrmeofhe.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_thljmXVSK9bkqDysfUmNgA_DF3orVZS';
+const WHATS = '5565996818656';
+if(!window.supabase){document.getElementById('mAuth').textContent='Não foi possível carregar o sistema. Verifique sua internet e atualize a página.';document.getElementById('mAuth').className='msg err';throw new Error('supabase-js não carregou')}
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+let modo = 'entrar', aluno = null, trilhas = [];
+
+function esc(s){return String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function hoje(){const d=new Date();d.setHours(0,0,0,0);return d}
+function dataLocal(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+function addDias(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function fmt(d){return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+
+// ---------- autenticação ----------
+function setModo(m){
+  modo=m;
+  $('tEntrar').classList.toggle('on',m==='entrar');
+  $('tCriar').classList.toggle('on',m==='criar');
+  $('campos-cad').classList.toggle('hidden',m!=='criar');
+  $('bAuth').textContent = m==='entrar' ? 'Entrar' : 'Criar minha conta';
+  $('senha').autocomplete = m==='entrar' ? 'current-password' : 'new-password';
+  msg('');
+}
+function msg(t,tipo){const e=$('mAuth');e.textContent=t;e.className='msg '+(tipo||'')}
+$('tEntrar').onclick=()=>setModo('entrar');
+$('tCriar').onclick=()=>setModo('criar');
+
+$('fAuth').onsubmit=async e=>{
+  e.preventDefault();
+  const email=$('email').value.trim(), senha=$('senha').value;
+  $('bAuth').disabled=true;
+  try{
+    if(modo==='criar'){
+      const nome=$('nome').value.trim(), whatsapp=$('whats').value.trim();
+      if(!nome){msg('Digite seu nome completo.','err');return}
+      const {data,error}=await sb.auth.signUp({email,password:senha,options:{data:{nome,whatsapp},emailRedirectTo:location.origin}});
+      if(error) throw error;
+      if(!data.session){msg('Conta criada! Confira seu e-mail para confirmar o cadastro e depois entre aqui.','ok');setModo('entrar');return}
+    }else{
+      const {error}=await sb.auth.signInWithPassword({email,password:senha});
+      if(error) throw error;
+    }
+  }catch(err){
+    const t=String(err.message||err);
+    msg(t.includes('Invalid login')?'E-mail ou senha incorretos.':t.includes('already registered')?'Esse e-mail já tem conta. Use a aba Entrar.':t.includes('Email not confirmed')?'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).':'Não deu certo: '+t,'err');
+  }finally{$('bAuth').disabled=false}
+};
+
+$('bEsqueci').onclick=async()=>{
+  const email=$('email').value.trim();
+  if(!email){msg('Digite seu e-mail acima e toque em "Esqueci minha senha" de novo.','err');return}
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin});
+  msg(error?'Não deu certo: '+error.message:'Enviamos um link para redefinir a senha no seu e-mail.',error?'err':'ok');
+};
+
+$('bSair').onclick=()=>sb.auth.signOut();
+
+sb.auth.onAuthStateChange(async (ev,session)=>{
+  if(ev==='PASSWORD_RECOVERY'){
+    const nova=prompt('Digite sua nova senha (mínimo 6 caracteres):');
+    if(nova){const {error}=await sb.auth.updateUser({password:nova});alert(error?'Erro: '+error.message:'Senha alterada!')}
+  }
+  if(session){ $('auth').classList.add('hidden'); $('app').classList.remove('hidden'); carregar(session.user) }
+  else { $('app').classList.add('hidden'); $('auth').classList.remove('hidden') }
+});
+
+// ---------- área do aluno ----------
+async function carregar(user){
+  const c=$('conteudo'); c.innerHTML='<div class="spin">Carregando…</div>';
+  const nome=(user.user_metadata?.nome||'').split(' ')[0];
+  $('hello').textContent = nome ? 'Olá, '+nome : 'Olá!';
+  const {data:mats,error}=await sb.from('matriculas').select('id,inicio,ativo,vence_em,trilha_id');
+  if(error){c.innerHTML='<div class="empty"><p>Erro ao carregar: '+esc(error.message)+'</p></div>';return}
+  const validas=(mats||[]).filter(m=>m.ativo && (!m.vence_em || dataLocal(m.vence_em)>=hoje()));
+  if(!validas.length){
+    const pausada=(mats||[]).length>0;
+    $('ttl').textContent = pausada ? 'Acesso pausado' : 'Quase lá!';
+    const txt=encodeURIComponent(pausada?'Oi Haroldo! Quero reativar meu acesso à Turma.':'Oi Haroldo! Criei minha conta na Turma ('+user.email+'). Pode liberar meu acesso?');
+    c.innerHTML=`<div class="empty card"><h3>${pausada?'Seu acesso está pausado':'Cadastro recebido ✅'}</h3>
+      <p>${pausada?'Para continuar estudando, regularize sua mensalidade com o Haroldo.':'Agora é só o Haroldo confirmar seu pagamento e liberar sua trilha. Você recebe o acesso em seguida.'}</p>
+      <a class="wa" href="https://wa.me/${WHATS}?text=${txt}" target="_blank">Falar com o Haroldo no WhatsApp</a></div>`;
+    return;
+  }
+  const {data:tr}=await sb.from('trilhas').select('id,nome,descricao,ordem').order('ordem');
+  trilhas=(tr||[]).map(t=>({...t,mat:validas.find(m=>m.trilha_id===t.id)})).filter(t=>t.mat);
+  if(trilhas.length===1) abrirTrilha(trilhas[0],false); else listarTrilhas();
+}
+
+function listarTrilhas(){
+  $('ttl').textContent='Suas trilhas'; $('prog').classList.add('hidden');
+  $('conteudo').innerHTML='<div class="sec">ESCOLHA A TRILHA</div>'+trilhas.map((t,i)=>
+    `<div class="card trilha" data-i="${i}"><div class="ic">${esc(t.nome[0])}</div>
+     <div><div class="wt">${esc(t.nome)}</div><div class="wd">${esc(t.descricao||'')}</div></div></div>`).join('');
+  document.querySelectorAll('.trilha').forEach(el=>el.onclick=()=>abrirTrilha(trilhas[el.dataset.i],true));
+}
+
+async function abrirTrilha(t,voltar){
+  const c=$('conteudo'); c.innerHTML='<div class="spin">Carregando…</div>';
+  $('ttl').textContent=t.nome;
+  const [{data:sem},{data:mt}]=await Promise.all([
+    sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id',t.id).order('numero'),
+    sb.from('materiais').select('id,semana_id,titulo,storage_path,ordem').order('ordem')
+  ]);
+  const ini=dataLocal(t.mat.inicio), h=hoje();
+  const lista=(sem||[]).map(s=>{const lib=addDias(ini,s.dias_para_liberar);return {...s,lib,aberta:h>=lib,mats:(mt||[]).filter(m=>m.semana_id===s.id)}});
+  const abertas=lista.filter(s=>s.aberta);
+  const atual=abertas.length?abertas[abertas.length-1].numero:null;
+  $('prog').classList.remove('hidden');
+  $('progTxt').textContent=`Você está na semana ${atual??1} · ${abertas.length} de ${lista.length} liberadas`;
+  setTimeout(()=>$('progBar').style.width=(lista.length?Math.round(abertas.length/lista.length*100):0)+'%',50);
+  let html=voltar?'<button class="back" id="bVoltar">‹ Todas as trilhas</button>':'';
+  html+='<div class="sec">SUA TRILHA SEMANAL</div>';
+  html+=lista.map(s=>{
+    const cls=!s.aberta?'lock':(s.numero===atual?'now':'ok');
+    const dias=Math.round((s.lib-h)/864e5);
+    const tag=!s.aberta?`<span class="tag soon">libera em ${dias} dia${dias>1?'s':''} · ${fmt(s.lib)}</span>`:(s.numero===atual?'<span class="tag new">nova</span>':'');
+    const mats=s.aberta?(s.mats.length?s.mats.map(m=>`<div class="mat"><span>📄 ${esc(m.titulo)}</span><button class="dl" data-p="${esc(m.storage_path)}">Abrir</button></div>`).join(''):'<div class="wd" style="margin-top:8px">Material em preparação.</div>'):'';
+    return `<div class="card week-card ${cls}"><div class="week"><div class="dot">${s.aberta?(s.numero===atual?s.numero:'✓'):'🔒'}</div>
+      <div style="flex:1"><div class="wt">Semana ${s.numero}${tag}</div><div class="wd">${esc(s.titulo)}${s.descricao?' · '+esc(s.descricao):''}</div>${mats}</div></div></div>`;
+  }).join('');
+  c.innerHTML=html;
+  if(voltar) $('bVoltar').onclick=listarTrilhas;
+  c.querySelectorAll('.dl').forEach(b=>b.onclick=()=>baixar(b));
+}
+
+async function baixar(b){
+  const old=b.textContent; b.textContent='Abrindo…'; b.disabled=true;
+  const w=window.open('','_blank');
+  const {data,error}=await sb.storage.from('materiais').createSignedUrl(b.dataset.p,600);
+  b.textContent=old; b.disabled=false;
+  if(error||!data){ if(w) w.close(); alert('Esse material ainda não está disponível. Tente mais tarde ou fale com o Haroldo.'); return }
+  if(w) w.location=data.signedUrl; else location.href=data.signedUrl;
+}
+</script>
+</body>
+</html>
