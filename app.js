@@ -201,7 +201,7 @@ const Aluno = {
     this.d = { semanas, leis: lei.data || [], avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds };
   },
 
-  ir(aba) { this.aba = aba; history.replaceState(null, '', '#a-' + aba); this.render(); window.scrollTo(0, 0) },
+  ir(aba, doVoltar) { if (!doVoltar && aba !== this.aba) history.pushState({ aba }, '', '#a-' + aba); this.aba = aba; this.render(); window.scrollTo(0, 0) },
 
   render() {
     const { semanas } = this.d;
@@ -436,7 +436,7 @@ const Leitor = {
   async abrir(id, titulo) {
     this.titulo = titulo; $('lTitulo').textContent = titulo;
     const box = $('lPages'); box.innerHTML = '<div class="lstatus">Preparando seu material…</div>';
-    $('leitor').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+    $('leitor').classList.remove('hidden'); document.body.style.overflow = 'hidden'; abrirCamada('leitor');
     try {
       const [blob] = await Promise.all([this.buscar(id), this.carregarPdfJs()]);
       this.blob = blob;
@@ -455,7 +455,7 @@ const Leitor = {
   },
   fechar() { $('leitor').classList.add('hidden'); $('lPages').innerHTML = ''; document.body.style.overflow = ''; this.blob = null }
 };
-$('lFechar').onclick = () => Leitor.fechar();
+$('lFechar').onclick = () => fecharCamada(() => Leitor.fechar());
 $('lBaixar').onclick = () => { if (Leitor.blob) Leitor.salvar(Leitor.blob, Leitor.titulo); else toast('Aguarde o material carregar.') };
 
 // ---------- PAINEL DO HAROLDO ----------
@@ -627,15 +627,24 @@ const Painel = {
   }
 };
 
+// ---------- botão voltar do celular: fecha a tela aberta em vez de sair do site ----------
+function abrirCamada(nome) { history.pushState({ camada: nome }, '') }
+function fecharCamada(fn) { if (history.state?.camada) history.back(); else fn() }
+window.addEventListener('popstate', e => {
+  if (!$('leitor').classList.contains('hidden')) return Leitor.fechar();
+  if (!$('jogo').classList.contains('hidden')) return Jogo.fechar();
+  if (location.hash !== '#painel' && typeof Aluno !== 'undefined' && Aluno.d) { const a = location.hash.startsWith('#a-') ? location.hash.slice(3) : 'inicio'; Aluno.ir(a, true) }
+});
+
 // ---------- app instalável ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
 
 // ---------- QUESTÕES INTERATIVAS ----------
 const Jogo = {
-  abrir(titulo) { $('jTitulo').textContent = titulo; $('jogo').classList.remove('hidden'); document.body.style.overflow = 'hidden'; $('jCorpo').innerHTML = '<div class="spin">Carregando…</div>' },
+  abrir(titulo) { $('jTitulo').textContent = titulo; if ($('jogo').classList.contains('hidden')) abrirCamada('jogo'); $('jogo').classList.remove('hidden'); document.body.style.overflow = 'hidden'; $('jCorpo').innerHTML = '<div class="spin">Carregando…</div>' },
   fechar() { $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
 };
-$('jFechar').onclick = () => Jogo.fechar();
+$('jFechar').onclick = () => fecharCamada(() => Jogo.fechar());
 const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>');
 
 const Quiz = {
@@ -701,7 +710,7 @@ const Quiz = {
       <p class="wd">Você acertou ${ac} de ${ids.length} nesta rodada.${ids.length - ac ? ' As que você errou foram para o seu Caderno de erros.' : ''}</p>
       ${ids.length - ac ? '<button class="btn" id="qErr2">Refazer as que errei</button>' : ''}<button class="btn sec2" id="qSair">Voltar</button></div>`;
     if ($('qErr2')) $('qErr2').onclick = () => { this.fila = this.fila.filter(x => !this.resp.get(x.id)?.acertou); this.mostrar(0) };
-    $('qSair').onclick = () => Jogo.fechar();
+    $('qSair').onclick = () => fecharCamada(() => Jogo.fechar());
   }
 };
 
@@ -750,6 +759,6 @@ const Flash = {
     $('jCorpo').innerHTML = `<div class="qstart"><div style="font-size:48px">🎉</div><h3>Sessão concluída!</h3>
       <p class="wd">Os cards voltam para revisão em 1, 3, 7, 15 e 30 dias, conforme você for acertando. Fique de olho na <b>Revisão do dia</b> no Início.</p>
       <button class="btn" id="fSair">Voltar</button></div>`;
-    $('fSair').onclick = () => Jogo.fechar();
+    $('fSair').onclick = () => fecharCamada(() => Jogo.fechar());
   }
 };
