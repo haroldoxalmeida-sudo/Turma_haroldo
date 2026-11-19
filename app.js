@@ -65,7 +65,8 @@ $('bEsqueci').onclick = async () => {
 };
 
 $('bSair').onclick = () => sb.auth.signOut();
-$('bPainel').onclick = () => { location.hash = location.hash === '#painel' ? '' : '#painel' };
+$('bPainel').onclick = () => { location.hash = location.hash === '#painel' ? '#a-inicio' : '#painel' };
+document.querySelectorAll('#nav [data-nav]').forEach(b => b.onclick = () => Aluno.ir(b.dataset.nav));
 window.addEventListener('hashchange', () => usuario && rotear());
 
 sb.auth.onAuthStateChange(async (ev, session) => {
@@ -99,90 +100,239 @@ function rotear() {
 }
 
 // ---------- área do aluno ----------
+const CAT = {
+  aula: ['📘', 'Aula Completa'], legislacao: ['⚖️', 'Legislação esquematizada'], mapa: ['🧠', 'Mapa mental'],
+  questoes: ['✍️', 'Questões comentadas'], flashcards: ['🃏', 'Flashcards'], simulado: ['🏆', 'Simulado'], extra: ['📎', 'Material extra']
+};
+const ORDEM_CAT = ['aula', 'legislacao', 'mapa', 'questoes', 'flashcards', 'simulado', 'extra'];
+const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { localStorage.setItem(k, v) } catch { } } };
+
 function cartaoInstalar() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const instalado = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (instalado || (!instalarEvt && !ios)) return '';
   return `<div class="install"><img src="icon-192.png" alt=""><div><b>Instale o app da Turma</b><br>${ios ? 'Toque em Compartilhar e depois em "Adicionar à Tela de Início".' : 'Acesse com um toque, direto da tela inicial.'}</div>${ios ? '' : '<button class="dl" style="background:var(--gold);color:var(--navy)" id="bInstalar">Instalar</button>'}</div>`;
 }
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instalarEvt = e; if (usuario && location.hash !== '#painel') carregarAluno() });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instalarEvt = e; if (usuario && Aluno.d && Aluno.aba === 'inicio') Aluno.render() });
+function ligarCopia(root) { root.querySelectorAll('[data-copia]').forEach(b => b.onclick = () => copiar(b.dataset.copia)) }
+function ligarInstalar() { const b = $('bInstalar'); if (b) b.onclick = async () => { if (!instalarEvt) return; instalarEvt.prompt(); await instalarEvt.userChoice; instalarEvt = null; b.closest('.install').remove() } }
+function carregarAluno() { Aluno.iniciar() }
 
-async function carregarAluno() {
-  const c = $('conteudo'); c.innerHTML = '<div class="spin">Carregando…</div>';
-  $('prog').classList.add('hidden');
-  const { data: mats, error } = await sb.from('matriculas').select('id,inicio,ativo,vence_em,trilha_id').eq('user_id', usuario.id);
-  if (error) { c.innerHTML = '<div class="empty"><p>Erro ao carregar: ' + esc(error.message) + '</p></div>'; return }
-  const validas = (mats || []).filter(m => m.ativo && (!m.vence_em || diasAte(m.vence_em) >= 0));
-  if (!validas.length) {
-    const pausada = (mats || []).length > 0;
+const Aluno = {
+  aba: 'inicio', d: null, trilha: null, filtro: 'todos', abertas: {},
+
+  async iniciar() {
+    const c = $('conteudo'); c.innerHTML = '<div class="spin">Carregando…</div>';
+    $('prog').classList.add('hidden'); $('nav').classList.add('hidden');
+    const { data: mats, error } = await sb.from('matriculas').select('id,inicio,ativo,vence_em,trilha_id').eq('user_id', usuario.id);
+    if (error) { c.innerHTML = '<div class="empty"><p>Erro ao carregar: ' + esc(error.message) + '</p></div>'; return }
+    const validas = (mats || []).filter(m => m.ativo && (!m.vence_em || diasAte(m.vence_em) >= 0));
+    if (!validas.length) return this.semAcesso((mats || []).length > 0);
+    const { data: tr } = await sb.from('trilhas').select('id,nome,descricao,ordem').order('ordem');
+    trilhas = (tr || []).map(t => ({ ...t, mat: validas.find(m => m.trilha_id === t.id) })).filter(t => t.mat);
+    const salva = ls.get('trilha');
+    this.trilha = trilhas.find(t => t.id === salva) || trilhas[0];
+    await this.carregar();
+    if (location.hash.startsWith('#a-')) this.aba = location.hash.slice(3);
+    this.render();
+  },
+
+  semAcesso(pausada) {
     $('ttl').textContent = pausada ? 'Acesso pausado' : 'Quase lá!';
     const txt = encodeURIComponent(pausada ? 'Oi Haroldo! Quero renovar meu acesso à Turma (' + usuario.email + ').' : 'Oi Haroldo! Criei minha conta na Turma (' + usuario.email + '). Pode liberar meu acesso?');
+    const c = $('conteudo');
     c.innerHTML = `<div class="empty card"><h3>${pausada ? 'Sua mensalidade venceu' : 'Cadastro recebido ✅'}</h3>
       <p>${pausada ? 'Para continuar estudando, faça o Pix da mensalidade e envie o comprovante ao Haroldo.' : 'Agora é só o Haroldo confirmar seu pagamento e liberar sua trilha.'}</p>
       ${cfg.chave_pix ? `<div class="alerta venc" style="margin-top:16px;text-align:left">Pix (${esc(cfg.valor_mensal || '')}): <div class="pix"><code>${esc(cfg.chave_pix)}</code><button class="dl" data-copia="${esc(cfg.chave_pix)}">Copiar</button></div>${cfg.nome_pix ? '<div style="margin-top:6px">Nome: ' + esc(cfg.nome_pix) + '</div>' : ''}</div>` : ''}
       <a class="wa" href="https://wa.me/${esc(cfg.whatsapp || '5565996818656')}?text=${txt}" target="_blank" rel="noopener">Falar com o Haroldo no WhatsApp</a></div>`;
     ligarCopia(c);
-    return;
+  },
+
+  async carregar() {
+    const t = this.trilha;
+    const [sem, mt, av, pm, ed] = await Promise.all([
+      sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id', t.id).order('numero'),
+      sb.from('materiais').select('id,semana_id,titulo,categoria,ordem').order('ordem'),
+      sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(10),
+      sb.from('progresso_materiais').select('material_id,concluido_em').eq('user_id', usuario.id),
+      sb.from('editais').select('id,nome,data_prova').eq('trilha_id', t.id).limit(1).maybeSingle()
+    ]);
+    const ini = dataLocal(t.mat.inicio), h = hoje();
+    const feitos = new Set((pm.data || []).map(x => x.material_id));
+    const semanas = (sem.data || []).map(s => {
+      const lib = addDias(ini, s.dias_para_liberar);
+      const itens = (mt.data || []).filter(m => m.semana_id === s.id).sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
+      const aberta = h >= lib;
+      const feitosN = itens.filter(i => feitos.has(i.id)).length;
+      return { ...s, lib, aberta, itens, feitosN, concluida: aberta && itens.length > 0 && feitosN === itens.length };
+    });
+    let edital = null;
+    if (ed.data) {
+      const [di, to, st, pt] = await Promise.all([
+        sb.from('edital_disciplinas').select('id,nome,ordem').eq('edital_id', ed.data.id).order('ordem'),
+        sb.from('edital_topicos').select('id,disciplina_id,texto,ordem').order('ordem'),
+        sb.from('semana_topicos').select('semana_id,topico_id'),
+        sb.from('progresso_topicos').select('topico_id').eq('user_id', usuario.id)
+      ]);
+      const concl = new Set(semanas.filter(s => s.concluida).map(s => s.id));
+      const auto = new Set((st.data || []).filter(x => concl.has(x.semana_id)).map(x => x.topico_id));
+      const manual = new Set((pt.data || []).map(x => x.topico_id));
+      const disc = (di.data || []).map(d => {
+        const tops = (to.data || []).filter(x => x.disciplina_id === d.id).map(x => ({ ...x, auto: auto.has(x.id), manual: manual.has(x.id) }));
+        const ok = tops.filter(x => x.auto || x.manual).length;
+        return { ...d, tops, ok, pct: tops.length ? Math.round(ok / tops.length * 100) : 0 };
+      });
+      const total = disc.reduce((a, d) => a + d.tops.length, 0), ok = disc.reduce((a, d) => a + d.ok, 0);
+      edital = { ...ed.data, disc, total, ok, pct: total ? Math.round(ok / total * 100) : 0 };
+    }
+    this.d = { semanas, avisos: av.data || [], feitos, edital };
+  },
+
+  ir(aba) { this.aba = aba; history.replaceState(null, '', '#a-' + aba); this.render(); window.scrollTo(0, 0) },
+
+  render() {
+    const { semanas } = this.d;
+    const abertas = semanas.filter(s => s.aberta);
+    this.atual = abertas[abertas.length - 1] || null;
+    $('nav').classList.remove('hidden');
+    $('nav').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.nav === this.aba));
+    const titulos = { inicio: 'Sua semana de estudos', materiais: 'Seus materiais', edital: 'Edital vivo', conta: 'Minha conta' };
+    $('ttl').textContent = titulos[this.aba];
+    $('prog').classList.add('hidden');
+    const c = $('conteudo');
+    c.innerHTML = (trilhas.length > 1 ? `<div class="pf" style="margin-bottom:12px"><select id="selTrilha">${trilhas.map(t => `<option value="${t.id}" ${t.id === this.trilha.id ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></div>` : '') + this['tela_' + this.aba]();
+    if ($('selTrilha')) $('selTrilha').onchange = async e => { this.trilha = trilhas.find(t => t.id === e.target.value); ls.set('trilha', this.trilha.id); c.innerHTML = '<div class="spin">Carregando…</div>'; await this.carregar(); this.render() };
+    this.ligar(c);
+  },
+
+  // --- componentes
+  item(i) {
+    const [ic, nome] = CAT[i.categoria] || CAT.extra, feito = this.d.feitos.has(i.id);
+    return `<div class="item ${feito ? 'feito' : ''}">
+      <button class="chk" data-feito="${i.id}" aria-label="Marcar como concluído">${feito ? '✓' : ''}</button>
+      <div class="itx"><div class="icat">${ic} ${nome}</div><div class="inm">${esc(i.titulo)}</div></div>
+      <div class="mb"><button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button></div></div>`;
+  },
+  barra(pct, txt) { return `<div class="pbar"><div style="width:${pct}%"></div></div>${txt ? `<div class="ptxt">${txt}</div>` : ''}` },
+  vencimento() {
+    const m = this.trilha.mat; if (!m.vence_em) return '';
+    const d = diasAte(m.vence_em); if (d > 3) return '';
+    const quando = d === 0 ? '<b>vence hoje</b>' : `vence em <b>${d} dia${d > 1 ? 's' : ''}</b> (${fmt(dataLocal(m.vence_em))})`;
+    return `<div class="alerta venc">⏰ Sua mensalidade ${quando}. Renove para não perder o acesso.
+      ${cfg.chave_pix ? `<div class="pix"><code>${esc(cfg.chave_pix)}</code><button class="dl" data-copia="${esc(cfg.chave_pix)}">Copiar Pix</button></div><div style="margin-top:6px">${esc(cfg.valor_mensal || '')}${cfg.nome_pix ? ' · ' + esc(cfg.nome_pix) : ''} · envie o comprovante no WhatsApp.</div>` : ''}</div>`;
+  },
+
+  // --- telas
+  tela_inicio() {
+    const { semanas, avisos, edital } = this.d, a = this.atual, h = hoje();
+    let html = this.vencimento();
+    if (!ls.get('comoFunciona')) html += `<div class="explica"><button class="x" id="bFecharExp" aria-label="Fechar">×</button><b>Como funciona a Turma</b>
+      <ol><li>Toda semana libera um <b>pacote novo</b>: aula completa, legislação, mapa mental, questões e flashcards.</li>
+      <li>Estude e toque no <b>círculo</b> de cada item para marcar como concluído.</li>
+      <li>Ao concluir a semana, os assuntos são marcados no seu <b>Edital vivo</b>.</li>
+      <li>Os <b>cadeados</b> mostram o que vem pela frente e quando chega.</li></ol></div>`;
+    const stats = [];
+    if (edital?.data_prova) { const f = diasAte(edital.data_prova); if (f >= 0) stats.push(`<div class="stat"><b>${f}</b><span>dias para a prova</span></div>`) }
+    if (edital) stats.push(`<div class="stat destaque" data-ir="edital"><b>${edital.pct}%</b><span>do edital estudado</span></div>`);
+    stats.push(`<div class="stat"><b>${semanas.filter(s => s.concluida).length}/${semanas.filter(s => s.aberta).length}</b><span>semanas concluídas</span></div>`);
+    html += `<div class="stats">${stats.join('')}</div>`;
+    if (a) {
+      const pct = a.itens.length ? Math.round(a.feitosN / a.itens.length * 100) : 0;
+      html += `<div class="sec">Estude esta semana</div><div class="card now semana">
+        <div class="shead"><div class="dot">${a.numero}</div><div style="flex:1"><div class="wt">Semana ${a.numero} · ${esc(a.titulo)}</div>${a.descricao ? `<div class="wd">${esc(a.descricao)}</div>` : ''}</div>${a.concluida ? '<span class="tag okk">concluída</span>' : ''}</div>
+        ${a.itens.length ? this.barra(pct, `${a.feitosN} de ${a.itens.length} itens concluídos`) + a.itens.map(i => this.item(i)).join('') : '<div class="wd" style="margin-top:8px">O material desta semana está sendo preparado. Fique de olho no mural!</div>'}</div>`;
+      const pend = semanas.filter(s => s.aberta && s !== a && !s.concluida && s.itens.length);
+      if (pend.length) html += `<div class="alerta pend">📌 Você tem ${pend.length} semana${pend.length > 1 ? 's' : ''} anterior${pend.length > 1 ? 'es' : ''} com itens pendentes. <button class="lnk" data-ir="materiais">Ver materiais ›</button></div>`;
+    }
+    const prox = semanas.filter(s => !s.aberta).slice(0, 3);
+    if (prox.length) html += `<div class="sec">Próximas semanas</div><div class="card">${prox.map(s => { const d = Math.round((s.lib - h) / 864e5); return `<div class="prox"><span class="cad">🔒</span><div style="flex:1"><div class="wt" style="font-size:14px">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">chega em ${fmt(s.lib)} · faltam ${d} dia${d > 1 ? 's' : ''}</div></div></div>` }).join('')}</div>`;
+    if (avisos.length) html += `<div class="sec">Avisos do Haroldo</div>` + avisos.slice(0, 3).map(av => this.aviso(av)).join('');
+    html += cartaoInstalar();
+    return html;
+  },
+  aviso(a) { return `<div class="aviso"><h4>📌 ${esc(a.titulo)}</h4>${a.texto ? `<p>${esc(a.texto)}</p>` : ''}${a.link ? `<a href="${esc(a.link)}" target="_blank" rel="noopener">Abrir link ›</a>` : ''}<div class="wd" style="margin-top:4px;font-size:11px">${new Date(a.criado_em).toLocaleDateString('pt-BR')}</div></div>` },
+
+  tela_materiais() {
+    const abertas = this.d.semanas.filter(s => s.aberta).reverse();
+    const cats = ORDEM_CAT.filter(k => abertas.some(s => s.itens.some(i => i.categoria === k)));
+    let html = `<div class="chips"><button data-filtro="todos" class="${this.filtro === 'todos' ? 'on' : ''}">Tudo</button>${cats.map(k => `<button data-filtro="${k}" class="${this.filtro === k ? 'on' : ''}">${CAT[k][0]} ${CAT[k][1]}</button>`).join('')}</div>`;
+    html += abertas.map((s, idx) => {
+      const itens = s.itens.filter(i => this.filtro === 'todos' || i.categoria === this.filtro);
+      if (this.filtro !== 'todos' && !itens.length) return '';
+      const aberto = this.abertas[s.id] ?? (idx === 0);
+      return `<div class="card ${s === this.atual ? 'now' : s.concluida ? 'ok' : ''} semana"><button class="shead btnhead" data-toggle="${s.id}">
+        <div class="dot">${s.concluida ? '✓' : s.numero}</div><div style="flex:1;text-align:left"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${s.feitosN}/${s.itens.length} concluídos</div></div><span class="seta">${aberto ? '▴' : '▾'}</span></button>
+        ${aberto ? (itens.length ? itens.map(i => this.item(i)).join('') : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : ''}</div>`;
+    }).join('');
+    const bloq = this.d.semanas.filter(s => !s.aberta).length;
+    if (bloq) html += `<div class="wd" style="text-align:center;margin:10px">🔒 Mais ${bloq} semana${bloq > 1 ? 's' : ''} chegando. Veja as datas no Início.</div>`;
+    return html;
+  },
+
+  tela_edital() {
+    const e = this.d.edital;
+    if (!e) return `<div class="empty card"><h3>📋 Edital vivo</h3><p>Em breve aqui você vai acompanhar o edital da sua prova tópico por tópico e ver quanto já estudou de cada disciplina.</p></div>`;
+    let html = `<div class="card edtop"><div class="ring" style="--p:${e.pct}"><span>${e.pct}%</span></div><div style="flex:1"><div class="wt">${esc(e.nome)}</div>
+      <div class="wd">${e.ok} de ${e.total} tópicos estudados${e.data_prova && diasAte(e.data_prova) >= 0 ? ` · prova em ${diasAte(e.data_prova)} dias` : ''}</div></div></div>
+      <div class="wd" style="margin:0 4px 12px">Os tópicos são marcados sozinhos quando você conclui a semana correspondente. Estudou por conta própria? Toque no tópico para marcar.</div>`;
+    html += e.disc.map(d => {
+      const aberto = this.abertas[d.id];
+      return `<div class="card disc"><button class="btnhead" data-toggle="${d.id}"><div style="flex:1;text-align:left"><div class="wt" style="font-size:14px">${esc(d.nome)}</div>${this.barra(d.pct, `${d.ok}/${d.tops.length} tópicos · ${d.pct}%`)}</div><span class="seta">${aberto ? '▴' : '▾'}</span></button>
+        ${aberto ? `<div class="tops">${d.tops.map(t => `<button class="etop ${t.auto || t.manual ? 'ok' : ''} ${t.auto ? 'auto' : ''}" data-topico="${t.id}" ${t.auto ? 'disabled' : ''}><span class="chk sm">${t.auto || t.manual ? '✓' : ''}</span><span>${esc(t.texto)}${t.auto ? ' <em>(pela trilha)</em>' : ''}</span></button>`).join('')}</div>` : ''}</div>`;
+    }).join('');
+    return html;
+  },
+
+  tela_conta() {
+    const m = this.trilha.mat, d = m.vence_em ? diasAte(m.vence_em) : null;
+    const nome = usuario.user_metadata?.nome || '';
+    return `<div class="card"><div class="wt">${esc(nome)}</div><div class="wd">${esc(usuario.email)}</div></div>
+      <div class="card"><div class="sec" style="margin-top:0">Sua assinatura</div>
+        <div class="linha"><span>Trilha</span><b>${esc(this.trilha.nome)}</b></div>
+        <div class="linha"><span>Aluno desde</span><b>${fmt(dataLocal(m.inicio))}</b></div>
+        ${m.vence_em ? `<div class="linha"><span>Próximo vencimento</span><b>${dataLocal(m.vence_em).toLocaleDateString('pt-BR')} ${d <= 3 ? '<span class="tag new">em ' + d + 'd</span>' : '<span class="tag okk">em dia</span>'}</b></div>` : ''}
+        ${cfg.chave_pix ? `<div class="alerta venc" style="margin:10px 0 0">Para renovar (${esc(cfg.valor_mensal || '')}):<div class="pix"><code>${esc(cfg.chave_pix)}</code><button class="dl" data-copia="${esc(cfg.chave_pix)}">Copiar Pix</button></div></div>` : ''}
+        <a class="wa" style="display:block;text-align:center" href="https://wa.me/${esc(cfg.whatsapp || '5565996818656')}" target="_blank" rel="noopener">Falar com o Haroldo</a></div>
+      ${cartaoInstalar()}
+      <div class="card pf"><div class="wt">Trocar senha</div><input id="novaSenha" type="password" placeholder="Nova senha (mínimo 6 caracteres)" style="margin-top:8px"><button class="btn" id="bSenha">Salvar nova senha</button></div>
+      <button class="btn" style="background:#fff;color:var(--red);border:1px solid var(--line)" id="bSair2">Sair da conta</button>`;
+  },
+
+  // --- ações
+  ligar(c) {
+    c.querySelectorAll('[data-ler]').forEach(b => b.onclick = () => Leitor.abrir(b.dataset.ler, b.dataset.t));
+    c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.t));
+    c.querySelectorAll('[data-feito]').forEach(b => b.onclick = () => this.alternarFeito(b.dataset.feito, b));
+    c.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.ir(b.dataset.ir));
+    c.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { this.filtro = b.dataset.filtro; this.render() });
+    c.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k = b.dataset.toggle; this.abertas[k] = !(this.abertas[k] ?? (this.aba === 'materiais' && this.d.semanas.filter(s => s.aberta).slice(-1)[0]?.id === k)); this.render() });
+    c.querySelectorAll('[data-topico]').forEach(b => b.onclick = () => this.alternarTopico(b.dataset.topico, b));
+    if ($('bFecharExp')) $('bFecharExp').onclick = () => { ls.set('comoFunciona', '1'); this.render() };
+    if ($('bSenha')) $('bSenha').onclick = async () => { const s = $('novaSenha').value; if (s.length < 6) { toast('A senha precisa ter pelo menos 6 caracteres.'); return } const { error } = await sb.auth.updateUser({ password: s }); toast(error ? 'Erro: ' + error.message : 'Senha alterada!'); $('novaSenha').value = '' };
+    if ($('bSair2')) $('bSair2').onclick = () => sb.auth.signOut();
+    ligarCopia(c); ligarInstalar();
+  },
+  async alternarFeito(id, b) {
+    b.disabled = true;
+    const feito = this.d.feitos.has(id);
+    const r = feito ? await sb.from('progresso_materiais').delete().eq('user_id', usuario.id).eq('material_id', id)
+      : await sb.from('progresso_materiais').insert({ material_id: id });
+    if (r.error) { toast('Erro: ' + r.error.message); b.disabled = false; return }
+    const antes = this.d.semanas.find(s => s.itens.some(i => i.id === id));
+    await this.carregar();
+    const depois = this.d.semanas.find(s => s.id === antes?.id);
+    if (depois?.concluida && !antes.concluida) toast('🎉 Semana ' + depois.numero + ' concluída! Edital atualizado.');
+    this.render();
+  },
+  async alternarTopico(id, b) {
+    b.disabled = true;
+    const t = this.d.edital.disc.flatMap(d => d.tops).find(x => x.id === id);
+    const r = t.manual ? await sb.from('progresso_topicos').delete().eq('user_id', usuario.id).eq('topico_id', id)
+      : await sb.from('progresso_topicos').insert({ topico_id: id });
+    if (r.error) { toast('Erro: ' + r.error.message); b.disabled = false; return }
+    await this.carregar(); this.render();
   }
-  const { data: tr } = await sb.from('trilhas').select('id,nome,descricao,ordem').order('ordem');
-  trilhas = (tr || []).map(t => ({ ...t, mat: validas.find(m => m.trilha_id === t.id) })).filter(t => t.mat);
-  if (trilhas.length === 1) abrirTrilha(trilhas[0], false); else listarTrilhas();
-}
-
-function listarTrilhas() {
-  $('ttl').textContent = 'Suas trilhas'; $('prog').classList.add('hidden');
-  $('conteudo').innerHTML = cartaoInstalar() + '<div class="sec">Escolha a trilha</div>' + trilhas.map((t, i) =>
-    `<div class="card trilha" data-i="${i}"><div class="ic">${esc(t.nome[0])}</div><div><div class="wt">${esc(t.nome)}</div><div class="wd">${esc(t.descricao || '')}</div></div></div>`).join('');
-  document.querySelectorAll('.trilha').forEach(el => el.onclick = () => abrirTrilha(trilhas[el.dataset.i], true));
-  ligarInstalar();
-}
-
-function blocoVencimento(m) {
-  if (!m.vence_em) return '';
-  const d = diasAte(m.vence_em);
-  if (d > 3) return '';
-  const quando = d === 0 ? '<b>vence hoje</b>' : `vence em <b>${d} dia${d > 1 ? 's' : ''}</b> (${fmt(dataLocal(m.vence_em))})`;
-  return `<div class="alerta venc">⏰ Sua mensalidade ${quando}. Renove para não perder o acesso.
-    ${cfg.chave_pix ? `<div class="pix"><code>${esc(cfg.chave_pix)}</code><button class="dl" data-copia="${esc(cfg.chave_pix)}">Copiar Pix</button></div><div style="margin-top:6px">${esc(cfg.valor_mensal || '')}${cfg.nome_pix ? ' · ' + esc(cfg.nome_pix) : ''} · envie o comprovante no WhatsApp.</div>` : ''}</div>`;
-}
-
-async function abrirTrilha(t, voltar) {
-  const c = $('conteudo'); c.innerHTML = '<div class="spin">Carregando…</div>';
-  $('ttl').textContent = t.nome;
-  const [{ data: sem }, { data: mt }, { data: av }] = await Promise.all([
-    sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id', t.id).order('numero'),
-    sb.from('materiais').select('id,semana_id,titulo,ordem').order('ordem'),
-    sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(5)
-  ]);
-  const ini = dataLocal(t.mat.inicio), h = hoje();
-  const lista = (sem || []).map(s => { const lib = addDias(ini, s.dias_para_liberar); return { ...s, lib, aberta: h >= lib, mats: (mt || []).filter(m => m.semana_id === s.id) } });
-  const abertas = lista.filter(s => s.aberta);
-  const atual = abertas.length ? abertas[abertas.length - 1].numero : null;
-  $('prog').classList.remove('hidden');
-  $('progTxt').textContent = `Você está na semana ${atual ?? 1} · ${abertas.length} de ${lista.length} liberadas`;
-  setTimeout(() => $('progBar').style.width = (lista.length ? Math.round(abertas.length / lista.length * 100) : 0) + '%', 50);
-
-  let html = voltar ? '<button class="back" id="bVoltar">‹ Todas as trilhas</button>' : '';
-  html += blocoVencimento(t.mat) + cartaoInstalar();
-  if ((av || []).length) html += '<div class="sec">Mural da turma</div>' + av.map(a =>
-    `<div class="aviso"><h4>📌 ${esc(a.titulo)}</h4>${a.texto ? `<p>${esc(a.texto)}</p>` : ''}${a.link ? `<a href="${esc(a.link)}" target="_blank" rel="noopener">Abrir link ›</a>` : ''}</div>`).join('');
-  html += '<div class="sec">Sua trilha semanal</div>';
-  html += lista.map(s => {
-    const cls = !s.aberta ? 'lock' : (s.numero === atual ? 'now' : 'ok');
-    const dias = Math.round((s.lib - h) / 864e5);
-    const tag = !s.aberta ? `<span class="tag soon">libera em ${dias} dia${dias > 1 ? 's' : ''} · ${fmt(s.lib)}</span>` : (s.numero === atual ? '<span class="tag new">nova</span>' : '');
-    const mats = s.aberta ? (s.mats.length ? s.mats.map(m => `<div class="mat"><span>📄 ${esc(m.titulo)}</span><div class="mb"><button class="dl" data-ler="${m.id}" data-t="${esc(m.titulo)}">Ler</button><button class="dl alt" data-baixar="${m.id}" data-t="${esc(m.titulo)}">Baixar</button></div></div>`).join('') : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : '';
-    return `<div class="card ${cls}"><div class="week"><div class="dot">${s.aberta ? (s.numero === atual ? s.numero : '✓') : '🔒'}</div>
-      <div style="flex:1"><div class="wt">Semana ${s.numero}${tag}</div><div class="wd">${esc(s.titulo)}${s.descricao ? ' · ' + esc(s.descricao) : ''}</div>${mats}</div></div></div>`;
-  }).join('');
-  c.innerHTML = html;
-  if (voltar) $('bVoltar').onclick = listarTrilhas;
-  c.querySelectorAll('[data-ler]').forEach(b => b.onclick = () => Leitor.abrir(b.dataset.ler, b.dataset.t));
-  c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.t));
-  ligarCopia(c); ligarInstalar();
-}
-function ligarCopia(root) { root.querySelectorAll('[data-copia]').forEach(b => b.onclick = () => copiar(b.dataset.copia)) }
-function ligarInstalar() { const b = $('bInstalar'); if (b) b.onclick = async () => { if (!instalarEvt) return; instalarEvt.prompt(); await instalarEvt.userChoice; instalarEvt = null; b.closest('.install').remove() } }
+};
 
 // ---------- PDF protegido ----------
 const Leitor = {
@@ -242,7 +392,7 @@ $('lBaixar').onclick = () => { if (Leitor.blob) Leitor.salvar(Leitor.blob, Leito
 const Painel = {
   aba: 'alunos', dados: null,
   async abrir() {
-    $('ttl').textContent = 'Painel do Haroldo'; $('prog').classList.add('hidden');
+    $('ttl').textContent = 'Painel do Haroldo'; $('prog').classList.add('hidden'); $('nav').classList.add('hidden');
     this.render();
   },
   async carregar() {
@@ -352,8 +502,8 @@ const Painel = {
     const prox = (ss.length ? Math.max(...ss.map(s => s.numero)) : 0) + 1;
     $('pBody').innerHTML = `<div class="card pf"><label style="margin-top:0">Trilha</label><select id="mTri">${this.opcoesTrilha(this.trilhaSel)}</select></div>
       ${ss.map(s => `<div class="card"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${esc(s.descricao || '')} · libera ${s.dias_para_liberar} dias após a entrada</div>
-        ${materiais.filter(m => m.semana_id === s.id).map(m => `<div class="mt"><span>📄 ${esc(m.titulo)}</span><button class="dl red" data-rmat="${m.id}" data-path="${esc(m.storage_path)}">Remover</button></div>`).join('') || '<div class="wd" style="margin-top:6px">Sem PDF ainda.</div>'}
-        <div class="pf"><label>Enviar PDF para esta semana</label><input type="file" accept="application/pdf" data-arq="${s.id}"><input placeholder="Nome do material (ex.: Simulado 01 comentado)" data-tit="${s.id}" style="margin-top:6px"><button class="btn" data-up="${s.id}" data-num="${s.numero}">Enviar PDF</button></div></div>`).join('')}
+        ${materiais.filter(m => m.semana_id === s.id).map(m => `<div class="mt"><span>${(CAT[m.categoria] || CAT.extra)[0]} ${esc(m.titulo)}</span><button class="dl red" data-rmat="${m.id}" data-path="${esc(m.storage_path)}">Remover</button></div>`).join('') || '<div class="wd" style="margin-top:6px">Sem PDF ainda.</div>'}
+        <div class="pf"><label>Enviar PDF para esta semana</label><input type="file" accept="application/pdf" data-arq="${s.id}"><select data-cat="${s.id}" style="margin-top:6px">${ORDEM_CAT.map(k => `<option value="${k}">${CAT[k][0]} ${CAT[k][1]}</option>`).join('')}</select><input placeholder="Nome do material (ex.: Lei de Drogas esquematizada)" data-tit="${s.id}" style="margin-top:6px"><button class="btn" data-up="${s.id}" data-num="${s.numero}">Enviar PDF</button></div></div>`).join('')}
       <div class="card pf"><div class="wt">Nova semana</div>
         <label>Número</label><input id="sNum" type="number" value="${prox}">
         <label>Título</label><input id="sTit" placeholder="Ex.: Organização Criminosa">
@@ -384,7 +534,8 @@ const Painel = {
     b.disabled = true; b.textContent = 'Enviando…';
     const up = await sb.storage.from('materiais').upload(caminho, arq, { contentType: 'application/pdf' });
     if (up.error) { toast('Erro no envio: ' + up.error.message); b.disabled = false; b.textContent = 'Enviar PDF'; return }
-    const r = await sb.from('materiais').insert({ semana_id: sid, titulo, storage_path: caminho });
+    const categoria = document.querySelector(`[data-cat="${sid}"]`).value;
+    const r = await sb.from('materiais').insert({ semana_id: sid, titulo, storage_path: caminho, categoria });
     toast(r.error ? 'Erro: ' + r.error.message : 'PDF publicado!'); this.render();
   },
 

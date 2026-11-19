@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="login">
 <div class="wrap">
@@ -47,6 +47,12 @@
       <div class="prog hidden" id="prog"><small id="progTxt"></small><div class="bar"><div id="progBar" style="width:0"></div></div></div>
     </div>
     <div class="content" id="conteudo"><div class="spin">Carregando…</div></div>
+    <nav class="nav hidden" id="nav">
+      <button data-nav="inicio"><span>🏠</span>Início</button>
+      <button data-nav="materiais"><span>📚</span>Materiais</button>
+      <button data-nav="edital"><span>📋</span>Edital</button>
+      <button data-nav="conta"><span>👤</span>Conta</button>
+    </nav>
   </section>
 
 </div>
@@ -58,6 +64,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
