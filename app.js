@@ -152,7 +152,7 @@ const Aluno = {
     const t = this.trilha;
     const [sem, mt, av, pm, ed] = await Promise.all([
       sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id', t.id).order('numero'),
-      sb.from('materiais').select('id,semana_id,titulo,categoria,ordem').order('ordem'),
+      sb.from('materiais').select('id,semana_id,titulo,categoria,ordem,storage_path').order('ordem'),
       sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(10),
       sb.from('progresso_materiais').select('material_id,concluido_em').eq('user_id', usuario.id),
       sb.from('editais').select('id,nome,data_prova').eq('trilha_id', t.id).limit(1).maybeSingle()
@@ -185,7 +185,16 @@ const Aluno = {
       const total = disc.reduce((a, d) => a + d.tops.length, 0), ok = disc.reduce((a, d) => a + d.ok, 0);
       edital = { ...ed.data, disc, total, ok, pct: total ? Math.round(ok / total * 100) : 0 };
     }
-    this.d = { semanas, avisos: av.data || [], feitos, edital };
+    const libIds = semanas.filter(s => s.aberta).map(s => s.id);
+    const [fc, rv, er] = await Promise.all([
+      libIds.length ? sb.from('flashcards').select('id,semana_id').in('semana_id', libIds) : { data: [] },
+      sb.from('flash_revisao').select('card_id,proxima').eq('user_id', usuario.id),
+      sb.from('respostas').select('questao_id').eq('user_id', usuario.id).eq('acertou', false)
+    ]);
+    const prox = new Map((rv.data || []).map(r => [r.card_id, r.proxima]));
+    const hojeIso = iso(hoje());
+    const devidos = (fc.data || []).filter(c => !prox.has(c.id) || prox.get(c.id) <= hojeIso);
+    this.d = { semanas, avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds };
   },
 
   ir(aba) { this.aba = aba; history.replaceState(null, '', '#a-' + aba); this.render(); window.scrollTo(0, 0) },
@@ -211,7 +220,9 @@ const Aluno = {
     return `<div class="item ${feito ? 'feito' : ''}">
       <button class="chk" data-feito="${i.id}" aria-label="Marcar como concluído">${feito ? '✓' : ''}</button>
       <div class="itx"><div class="icat">${ic} ${nome}</div><div class="inm">${esc(i.titulo)}</div></div>
-      <div class="mb"><button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button></div></div>`;
+      <div class="mb">${!i.storage_path && (i.categoria === 'questoes' || i.categoria === 'flashcards')
+        ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : 'Praticar'}</button>`
+        : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button>`}</div></div>`;
   },
   barra(pct, txt) { return `<div class="pbar"><div style="width:${pct}%"></div></div>${txt ? `<div class="ptxt">${txt}</div>` : ''}` },
   vencimento() {
@@ -236,6 +247,10 @@ const Aluno = {
     if (edital) stats.push(`<div class="stat destaque" data-ir="edital"><b>${edital.pct}%</b><span>do edital estudado</span></div>`);
     stats.push(`<div class="stat"><b>${semanas.filter(s => s.concluida).length}/${semanas.filter(s => s.aberta).length}</b><span>semanas concluídas</span></div>`);
     html += `<div class="stats">${stats.join('')}</div>`;
+    const { revisar, novos, erros } = this.d;
+    if (revisar || novos || erros) html += `<div class="atalhos">
+      ${revisar || novos ? `<button class="atalho a1" data-jogo="flashcards" data-sem="todas"><span>🃏</span><div><b>Revisão do dia</b><small>${revisar ? revisar + ' card' + (revisar > 1 ? 's' : '') + ' para revisar' : ''}${revisar && novos ? ' · ' : ''}${novos ? novos + ' novo' + (novos > 1 ? 's' : '') : ''}</small></div></button>` : ''}
+      ${erros ? `<button class="atalho a2" data-jogo="erros" data-sem="todas"><span>📕</span><div><b>Caderno de erros</b><small>${erros} questão${erros > 1 ? 'ões' : ''} para refazer</small></div></button>` : ''}</div>`;
     if (a) {
       const pct = a.itens.length ? Math.round(a.feitosN / a.itens.length * 100) : 0;
       html += `<div class="sec">Estude esta semana</div><div class="card now semana">
@@ -303,6 +318,7 @@ const Aluno = {
     c.querySelectorAll('[data-ler]').forEach(b => b.onclick = () => Leitor.abrir(b.dataset.ler, b.dataset.t));
     c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.t));
     c.querySelectorAll('[data-feito]').forEach(b => b.onclick = () => this.alternarFeito(b.dataset.feito, b));
+    c.querySelectorAll('[data-jogo]').forEach(b => b.onclick = () => b.dataset.jogo === 'flashcards' ? Flash.abrir(b.dataset.sem, b.dataset.mat) : Quiz.abrir(b.dataset.sem, b.dataset.mat, b.dataset.jogo === 'erros'));
     c.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.ir(b.dataset.ir));
     c.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { this.filtro = b.dataset.filtro; this.render() });
     c.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k = b.dataset.toggle; this.abertas[k] = !(this.abertas[k] ?? (this.aba === 'materiais' && this.d.semanas.filter(s => s.aberta).slice(-1)[0]?.id === k)); this.render() });
@@ -558,3 +574,124 @@ const Painel = {
 
 // ---------- app instalável ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+
+// ---------- QUESTÕES INTERATIVAS ----------
+const Jogo = {
+  abrir(titulo) { $('jTitulo').textContent = titulo; $('jogo').classList.remove('hidden'); document.body.style.overflow = 'hidden'; $('jCorpo').innerHTML = '<div class="spin">Carregando…</div>' },
+  fechar() { $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
+};
+$('jFechar').onclick = () => Jogo.fechar();
+const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>');
+
+const Quiz = {
+  async abrir(semana, matId, soErros) {
+    Jogo.abrir(soErros ? 'Caderno de erros' : 'Questões comentadas');
+    this.matId = matId; this.soErros = soErros;
+    let q = sb.from('questoes').select('*').order('ordem');
+    q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
+    const [{ data: qs }, { data: rs }] = await Promise.all([q, sb.from('respostas').select('questao_id,resposta,acertou,tentativas').eq('user_id', usuario.id)]);
+    this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
+    this.todas = qs || [];
+    if (soErros) { this.fila = this.todas.filter(x => this.resp.get(x.id)?.acertou === false); return this.fila.length ? this.mostrar(0) : this.vazio('Seu caderno de erros está vazio. 🎉') }
+    this.inicio();
+  },
+  vazio(t) { $('jCorpo').innerHTML = `<div class="empty"><h3>${t}</h3></div>` },
+  inicio() {
+    const tot = this.todas.length, resp = this.todas.filter(x => this.resp.has(x.id)), ac = resp.filter(x => this.resp.get(x.id).acertou).length;
+    const erradas = resp.length - ac, pend = this.todas.findIndex(x => !this.resp.has(x.id));
+    $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:${tot ? Math.round(resp.length / tot * 100) : 0}"><span>${resp.length}/${tot}</span></div>
+      <h3>${tot} questões comentadas</h3><p class="wd">${resp.length ? `Você já respondeu ${resp.length} · acertou ${ac} (${Math.round(ac / resp.length * 100)}%)` : 'Responda e veja na hora o comentário de cada questão.'}</p>
+      ${pend >= 0 ? `<button class="btn" id="qCont">${resp.length ? 'Continuar de onde parei' : 'Começar'}</button>` : ''}
+      ${erradas ? `<button class="btn sec2" id="qErr">Refazer só as que errei (${erradas})</button>` : ''}
+      ${resp.length ? `<button class="btn sec2" id="qTudo">Recomeçar do início</button>` : ''}</div>`;
+    if ($('qCont')) $('qCont').onclick = () => { this.fila = this.todas; this.mostrar(pend) };
+    if ($('qErr')) $('qErr').onclick = () => { this.fila = this.todas.filter(x => this.resp.get(x.id)?.acertou === false); this.mostrar(0) };
+    if ($('qTudo')) $('qTudo').onclick = () => { this.fila = this.todas; this.mostrar(0) };
+  },
+  mostrar(i) {
+    this.i = i; const q = this.fila[i]; if (!q) return this.fim();
+    const ops = q.tipo === 'ce' ? [['C', 'Certo'], ['E', 'Errado']] : (q.alternativas || []).map((t, k) => ['ABCDE'[k], t]);
+    $('jCorpo').innerHTML = `<div class="qbar"><div style="width:${Math.round(i / this.fila.length * 100)}%"></div></div>
+      <div class="qmeta">Questão ${i + 1} de ${this.fila.length}${q.assunto ? ' · ' + esc(q.assunto) : ''}${q.tipo === 'ce' ? ' · <b>Certo ou Errado</b>' : ''}</div>
+      <div class="qenun">${esc(q.enunciado)}</div>
+      <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop" data-op="${L}"><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
+      <div id="qFeed"></div>`;
+    $('jCorpo').scrollTop = 0;
+    $('jCorpo').querySelectorAll('.qop').forEach(b => b.onclick = () => this.responder(q, b.dataset.op));
+  },
+  async responder(q, op) {
+    const ok = op === q.gabarito;
+    $('jCorpo').querySelectorAll('.qop').forEach(b => { b.disabled = true; if (b.dataset.op === q.gabarito) b.classList.add('certa'); else if (b.dataset.op === op) b.classList.add('errada') });
+    const ant = this.resp.get(q.id);
+    const linha = { questao_id: q.id, resposta: op, acertou: ok, tentativas: (ant?.tentativas || 0) + 1, respondido_em: new Date().toISOString() };
+    this.resp.set(q.id, linha); Jogo.mudou = true;
+    sb.from('respostas').upsert(linha, { onConflict: 'user_id,questao_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
+    const gab = q.tipo === 'ce' ? (q.gabarito === 'C' ? 'Certo' : 'Errado') : 'letra ' + q.gabarito;
+    $('qFeed').innerHTML = `<div class="qres ${ok ? 'ok' : 'no'}">${ok ? '✅ Você acertou!' : '❌ Não foi dessa vez.'}</div>
+      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}
+      ${q.como_cobra ? `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>` : ''}
+      ${q.armadilha ? `<p><b class="ar">Armadilha:</b> ${limpaHtml(q.armadilha)}</p>` : ''}
+      <p class="qgab">Gabarito: ${gab}</p></div>
+      <button class="btn" id="qProx">${this.i + 1 < this.fila.length ? 'Próxima questão ›' : 'Ver resultado'}</button>`;
+    $('qProx').onclick = () => this.mostrar(this.i + 1);
+    $('qFeed').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  async fim() {
+    const ids = this.fila.map(x => x.id), ac = ids.filter(id => this.resp.get(id)?.acertou).length, pct = ids.length ? Math.round(ac / ids.length * 100) : 0;
+    if (this.matId && this.todas.every(x => this.resp.has(x.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
+    $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:${pct}"><span>${pct}%</span></div>
+      <h3>${pct >= 80 ? 'Excelente! 🔥' : pct >= 60 ? 'Bom resultado! 💪' : 'Continue treinando! 📚'}</h3>
+      <p class="wd">Você acertou ${ac} de ${ids.length} nesta rodada.${ids.length - ac ? ' As que você errou foram para o seu Caderno de erros.' : ''}</p>
+      ${ids.length - ac ? '<button class="btn" id="qErr2">Refazer as que errei</button>' : ''}<button class="btn sec2" id="qSair">Voltar</button></div>`;
+    if ($('qErr2')) $('qErr2').onclick = () => { this.fila = this.fila.filter(x => !this.resp.get(x.id)?.acertou); this.mostrar(0) };
+    $('qSair').onclick = () => Jogo.fechar();
+  }
+};
+
+// ---------- FLASHCARDS COM REVISÃO ESPAÇADA ----------
+const INTERVALOS = [1, 3, 7, 15, 30];
+const Flash = {
+  async abrir(semana, matId) {
+    Jogo.abrir('Flashcards'); this.matId = matId;
+    let q = sb.from('flashcards').select('*').order('ordem');
+    q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
+    const [{ data: cs }, { data: rv }] = await Promise.all([q, sb.from('flash_revisao').select('card_id,caixa,proxima').eq('user_id', usuario.id)]);
+    this.rev = new Map((rv || []).map(r => [r.card_id, r])); this.cards = cs || [];
+    const h = iso(hoje());
+    const dev = this.cards.filter(c => !this.rev.has(c.id) || this.rev.get(c.id).proxima <= h);
+    const vistos = this.cards.filter(c => this.rev.has(c.id)).length;
+    $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:${this.cards.length ? Math.round(vistos / this.cards.length * 100) : 0}"><span>${vistos}/${this.cards.length}</span></div>
+      <h3>${dev.length ? dev.length + ' card' + (dev.length > 1 ? 's' : '') + ' para hoje' : 'Tudo revisado por hoje! ✅'}</h3>
+      <p class="wd">Leia a pergunta, tente lembrar e vire o card. Marque <b>Sabia</b> ou <b>Revisar</b>: os que você marcar para revisar voltam antes.</p>
+      ${dev.length ? '<button class="btn" id="fIni">Começar</button>' : ''}<button class="btn sec2" id="fTodos">Praticar todos os ${this.cards.length}</button></div>`;
+    if ($('fIni')) $('fIni').onclick = () => this.sessao(dev);
+    $('fTodos').onclick = () => this.sessao([...this.cards]);
+  },
+  sessao(lista) { this.fila = lista; this.feitos = 0; this.revisar = 0; this.mostrar() },
+  mostrar() {
+    const c = this.fila[0]; if (!c) return this.fim();
+    $('jCorpo').innerHTML = `<div class="qmeta">Restam ${this.fila.length} · ✅ ${this.feitos} · 🔁 ${this.revisar}</div>
+      <div class="fcard" id="fCard"><div class="fface ffr"><small>PERGUNTA</small><div>${esc(c.frente)}</div><em>Toque para ver a resposta</em></div><div class="fface fbk"><small>RESPOSTA</small><div>${esc(c.verso)}</div></div></div>
+      <div class="fbtns hidden" id="fBtns"><button class="btn rv" id="fRev">🔁 Revisar</button><button class="btn sb" id="fSab">✅ Sabia</button></div>`;
+    $('fCard').onclick = () => { $('fCard').classList.add('virado'); $('fBtns').classList.remove('hidden') };
+    $('fRev').onclick = () => this.marcar(c, false);
+    $('fSab').onclick = () => this.marcar(c, true);
+  },
+  marcar(c, sabia) {
+    const ant = this.rev.get(c.id), cx = sabia ? Math.min((ant?.caixa ?? -1) + 1, INTERVALOS.length - 1) : 0;
+    const prox = iso(addDias(hoje(), sabia ? INTERVALOS[cx] : 0));
+    const linha = { card_id: c.id, caixa: cx, proxima: prox, atualizado_em: new Date().toISOString() };
+    this.rev.set(c.id, linha); Jogo.mudou = true;
+    sb.from('flash_revisao').upsert(linha, { onConflict: 'user_id,card_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
+    this.fila.shift();
+    if (sabia) this.feitos++; else { this.revisar++; this.fila.push(c) }
+    this.mostrar();
+  },
+  async fim() {
+    if (this.matId && this.cards.every(c => this.rev.has(c.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
+    $('jCorpo').innerHTML = `<div class="qstart"><div style="font-size:48px">🎉</div><h3>Sessão concluída!</h3>
+      <p class="wd">Os cards voltam para revisão em 1, 3, 7, 15 e 30 dias, conforme você for acertando. Fique de olho na <b>Revisão do dia</b> no Início.</p>
+      <button class="btn" id="fSair">Voltar</button></div>`;
+    $('fSair').onclick = () => Jogo.fechar();
+  }
+};
