@@ -228,7 +228,7 @@ const Aluno = {
         ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : 'Praticar'}</button>`
         : !i.storage_path ? `<button class="dl gold" data-aula="${i.id}" data-t="${esc(i.titulo)}">Ler aula</button>`
         : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button>`}</div></div>
-      ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span><button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" aria-label="Baixar">⬇</button></div>` : ''}`;
+      ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span>${mapa.storage_path ? `<button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" aria-label="Baixar">⬇</button>` : `<button class="dl alt" data-aula="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button>`}</div>` : ''}`;
   },
   // semana organizada em dias, com 2 disciplinas por dia
   dias(s) {
@@ -667,6 +667,7 @@ const Aula = {
       <div class="wm" aria-hidden="true">${Array(40).fill(`<span>${marca}</span>`).join('')}</div>
       <article class="aula">${html}<p class="uso">Material de uso exclusivo de ${marca}. Proibida a reprodução ou o compartilhamento.</p></article>`;
     $('jCorpo').scrollTop = 0;
+    $('jCorpo').querySelectorAll('figure.esq').forEach(f => f.onclick = () => f.classList.toggle('zoom'));
     $('aPdf').onclick = () => { document.body.classList.add('imprimindo'); setTimeout(() => { window.print(); document.body.classList.remove('imprimindo') }, 50) };
   }
 };
