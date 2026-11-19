@@ -1,0 +1,10 @@
+// Service worker simples: deixa o site instalável e guarda a "casca" do app para abrir mais rápido.
+const CACHE = 'turma-v2';
+const CASCA = ['./', 'index.html', 'style.css?v=2', 'app.js?v=2', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CASCA)).catch(() => {})); self.skipWaiting() });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim() });
+self.addEventListener('fetch', e => {
+  const u = new URL(e.request.url);
+  if (e.request.method !== 'GET' || u.origin !== location.origin) return; // Supabase e PDFs sempre pela rede
+  e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put(e.request, c)); return r }).catch(() => caches.match(e.request)));
+});
