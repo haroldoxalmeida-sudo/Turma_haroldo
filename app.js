@@ -644,6 +644,7 @@ const Quiz = {
     this.matId = matId; this.soErros = soErros;
     let q = sb.from('questoes').select('*').order('ordem');
     q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
+    if (semana !== 'todas' && matId) q = q.eq('material_id', matId);
     const [{ data: qs }, { data: rs }] = await Promise.all([q, sb.from('respostas').select('questao_id,resposta,acertou,tentativas').eq('user_id', usuario.id)]);
     this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
     this.todas = qs || [];
@@ -668,6 +669,7 @@ const Quiz = {
     const ops = q.tipo === 'ce' ? [['C', 'Certo'], ['E', 'Errado']] : (q.alternativas || []).map((t, k) => ['ABCDE'[k], t]);
     $('jCorpo').innerHTML = `<div class="qbar"><div style="width:${Math.round(i / this.fila.length * 100)}%"></div></div>
       <div class="qmeta">Questão ${i + 1} de ${this.fila.length}${q.assunto ? ' · ' + esc(q.assunto) : ''}${q.tipo === 'ce' ? ' · <b>Certo ou Errado</b>' : ''}</div>
+      ${q.texto_base ? `<details class="qtexto" ${i === 0 || this.fila[i - 1]?.texto_base !== q.texto_base ? 'open' : ''}><summary>📄 Leia o texto</summary><div>${esc(q.texto_base)}</div></details>` : ''}
       <div class="qenun">${esc(q.enunciado)}</div>
       <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop" data-op="${L}"><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
       <div id="qFeed"></div>`;
@@ -710,6 +712,7 @@ const Flash = {
     Jogo.abrir('Flashcards'); this.matId = matId;
     let q = sb.from('flashcards').select('*').order('ordem');
     q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
+    if (semana !== 'todas' && matId) q = q.eq('material_id', matId);
     const [{ data: cs }, { data: rv }] = await Promise.all([q, sb.from('flash_revisao').select('card_id,caixa,proxima').eq('user_id', usuario.id)]);
     this.rev = new Map((rv || []).map(r => [r.card_id, r])); this.cards = cs || [];
     const h = iso(hoje());
