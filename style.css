@@ -226,6 +226,7 @@ button{font-family:inherit}
 .lei:last-child{border-bottom:0}
 a.dl{text-decoration:none;display:inline-block}
 .qtexto{background:#fff;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.qtexto svg{max-width:100%;height:auto;display:block}
 .qtexto summary{font-weight:600;color:var(--navy);cursor:pointer;font-size:13px}
 .qtexto div{white-space:pre-line;font-size:14px;line-height:1.6;margin-top:8px;color:var(--ink)}
 .assin{background:#fff;border:1px solid #BFE3CF;border-radius:14px;margin-bottom:12px;overflow:hidden}

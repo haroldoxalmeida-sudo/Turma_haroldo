@@ -717,7 +717,7 @@ const Quiz = {
     const ops = q.tipo === 'ce' ? [['C', 'Certo'], ['E', 'Errado']] : (q.alternativas || []).map((t, k) => ['ABCDE'[k], t]);
     $('jCorpo').innerHTML = `<div class="qbar"><div style="width:${Math.round(i / this.fila.length * 100)}%"></div></div>
       <div class="qmeta">Questão ${i + 1} de ${this.fila.length}${q.assunto ? ' · ' + esc(q.assunto) : ''}${q.tipo === 'ce' ? ' · <b>Certo ou Errado</b>' : ''}</div>
-      ${q.texto_base ? `<details class="qtexto" ${i === 0 || this.fila[i - 1]?.texto_base !== q.texto_base ? 'open' : ''}><summary>📄 Leia o texto</summary><div>${esc(q.texto_base)}</div></details>` : ''}
+      ${q.texto_base ? `<details class="qtexto" ${i === 0 || this.fila[i - 1]?.texto_base !== q.texto_base ? 'open' : ''}><summary>📄 Leia o texto</summary><div>${q.texto_base.startsWith('<svg') ? q.texto_base : esc(q.texto_base)}</div></details>` : ''}
       <div class="qenun">${esc(q.enunciado)}</div>
       <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop" data-op="${L}"><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
       <div id="qFeed"></div>`;
