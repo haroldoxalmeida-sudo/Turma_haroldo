@@ -1,6 +1,6 @@
 // Service worker simples: deixa o site instalável e guarda a "casca" do app para abrir mais rápido.
-const CACHE = 'turma-v16';
-const CASCA = ['./', 'index.html', 'style.css?v=16', 'app.js?v=16', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
+const CACHE = 'turma-v17';
+const CASCA = ['./', 'index.html', 'style.css?v=17', 'app.js?v=17', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CASCA)).catch(() => {})); self.skipWaiting() });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim() });
 self.addEventListener('fetch', e => {
