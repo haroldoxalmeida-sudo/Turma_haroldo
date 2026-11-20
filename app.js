@@ -107,6 +107,8 @@ const CAT = {
 const ORDEM_CAT = ['aula', 'legislacao', 'mapa', 'questoes', 'flashcards', 'simulado', 'extra'];
 const EXTRAS = ['mapa', 'extra'];
 const DIA_NOME = { 6: 'Simulado da semana' };
+// semanas liberadas + aulas reaproveitadas de outros cursos (catálogo)
+const filtroLib = (q, sem, mats) => mats && mats.length ? q.or(`semana_id.in.(${sem.join(',')}),material_id.in.(${mats.join(',')})`) : q.in('semana_id', sem);
 const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { localStorage.setItem(k, v) } catch { } } };
 
 function cartaoInstalar() {
@@ -152,19 +154,22 @@ const Aluno = {
 
   async carregar() {
     const t = this.trilha;
-    const [sem, mt, av, pm, ed, lei] = await Promise.all([
+    const [sem, mt, av, pm, ed, lei, lk] = await Promise.all([
       sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar,plano').eq('trilha_id', t.id).order('numero'),
       sb.from('materiais').select('id,semana_id,titulo,categoria,ordem,storage_path,dia,disciplina').order('ordem'),
       sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(10),
       sb.from('progresso_materiais').select('material_id,concluido_em').eq('user_id', usuario.id),
       sb.from('editais').select('id,nome,data_prova').eq('trilha_id', t.id).limit(1).maybeSingle(),
-      sb.from('leis').select('id,grupo,nome,numero,url_oficial,ordem,conferida_em').or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('ordem')
+      sb.from('leis').select('id,grupo,nome,numero,url_oficial,ordem,conferida_em').or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('ordem'),
+      sb.from('semana_materiais').select('semana_id,material_id,dia,ordem')
     ]);
+    const porId = new Map((mt.data || []).map(m => [m.id, m]));
     const ini = dataLocal(t.mat.inicio), h = hoje();
     const feitos = new Set((pm.data || []).map(x => x.material_id));
     const semanas = (sem.data || []).map(s => {
       const lib = addDias(ini, s.dias_para_liberar);
-      const itens = (mt.data || []).filter(m => m.semana_id === s.id).sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
+      const ligados = (lk.data || []).filter(l => l.semana_id === s.id && porId.has(l.material_id)).map(l => ({ ...porId.get(l.material_id), dia: l.dia ?? porId.get(l.material_id).dia, ordem: l.ordem ?? 0, ligado: true }));
+      const itens = (mt.data || []).filter(m => m.semana_id === s.id).concat(ligados).sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
       const aberta = h >= lib;
       const conta = itens.filter(i => !EXTRAS.includes(i.categoria));
       const feitosN = conta.filter(i => feitos.has(i.id)).length;
@@ -190,15 +195,16 @@ const Aluno = {
       edital = { ...ed.data, disc, total, ok, pct: total ? Math.round(ok / total * 100) : 0 };
     }
     const libIds = semanas.filter(s => s.aberta).map(s => s.id);
+    const libLig = semanas.filter(s => s.aberta).flatMap(s => s.itens.filter(i => i.ligado).map(i => i.id));
     const [fc, rv, er] = await Promise.all([
-      libIds.length ? sb.from('flashcards').select('id,semana_id').in('semana_id', libIds) : { data: [] },
+      libIds.length ? filtroLib(sb.from('flashcards').select('id,semana_id'), libIds, libLig) : { data: [] },
       sb.from('flash_revisao').select('card_id,proxima').eq('user_id', usuario.id),
       sb.from('respostas').select('questao_id').eq('user_id', usuario.id).eq('acertou', false)
     ]);
     const prox = new Map((rv.data || []).map(r => [r.card_id, r.proxima]));
     const hojeIso = iso(hoje());
     const devidos = (fc.data || []).filter(c => !prox.has(c.id) || prox.get(c.id) <= hojeIso);
-    this.d = { semanas, leis: lei.data || [], avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds };
+    this.d = { semanas, leis: lei.data || [], avisos: av.data || [], feitos, edital, revisar: devidos.filter(c => prox.has(c.id)).length, novos: devidos.filter(c => !prox.has(c.id)).length, erros: (er.data || []).length, libIds, libLig };
   },
 
   ir(aba, doVoltar) { if (!doVoltar && aba !== this.aba) history.pushState({ aba }, '', '#a-' + aba); this.aba = aba; this.render(); window.scrollTo(0, 0) },
@@ -686,8 +692,7 @@ const Quiz = {
     Jogo.abrir(soErros ? 'Caderno de erros' : 'Questões comentadas');
     this.matId = matId; this.soErros = soErros;
     let q = sb.from('questoes').select('*').order('ordem');
-    q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
-    if (semana !== 'todas' && matId) q = q.eq('material_id', matId);
+    q = semana === 'todas' ? filtroLib(q, Aluno.d.libIds, Aluno.d.libLig) : matId ? q.eq('material_id', matId) : q.eq('semana_id', semana);
     const [{ data: qs }, { data: rs }] = await Promise.all([q, sb.from('respostas').select('questao_id,resposta,acertou,tentativas').eq('user_id', usuario.id)]);
     this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
     this.todas = qs || [];
@@ -756,8 +761,7 @@ const Flash = {
   async abrir(semana, matId) {
     Jogo.abrir('Flashcards'); this.matId = matId;
     let q = sb.from('flashcards').select('*').order('ordem');
-    q = semana === 'todas' ? q.in('semana_id', Aluno.d.libIds) : q.eq('semana_id', semana);
-    if (semana !== 'todas' && matId) q = q.eq('material_id', matId);
+    q = semana === 'todas' ? filtroLib(q, Aluno.d.libIds, Aluno.d.libLig) : matId ? q.eq('material_id', matId) : q.eq('semana_id', semana);
     const [{ data: cs }, { data: rv }] = await Promise.all([q, sb.from('flash_revisao').select('card_id,caixa,proxima').eq('user_id', usuario.id)]);
     this.rev = new Map((rv || []).map(r => [r.card_id, r])); this.cards = cs || [];
     const h = iso(hoje());
