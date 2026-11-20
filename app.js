@@ -748,6 +748,8 @@ const Quiz = {
 
 // ---------- FLASHCARDS COM REVISÃO ESPAÇADA ----------
 const INTERVALOS = [1, 3, 7, 15, 30];
+const FTIPO = { lei: ['📜 LEI SECA', '#C9971F'], peg: ['⚠️ PEGADINHA', '#C0392B'], jur: ['⚖️ JURISPRUDÊNCIA', '#6B4FA0'], con: ['💡 CONCEITO', '#2F6FB2'], cmp: ['🔀 COMPARATIVO', '#1E7A4F'] };
+const limpaCard = s => esc(s || '').replace(/&lt;(\/?)(b|i|table|tr|th|td)&gt;/g, '<$1$2>').replace(/&lt;br\s*\/?&gt;/g, '<br>');
 const Flash = {
   async abrir(semana, matId) {
     Jogo.abrir('Flashcards'); this.matId = matId;
@@ -769,10 +771,15 @@ const Flash = {
   sessao(lista) { this.fila = lista; this.feitos = 0; this.revisar = 0; this.mostrar() },
   mostrar() {
     const c = this.fila[0]; if (!c) return this.fim();
+    const t = FTIPO[c.tipo], cor = t ? t[1] : 'var(--gold)';
     $('jCorpo').innerHTML = `<div class="qmeta">Restam ${this.fila.length} · ✅ ${this.feitos} · 🔁 ${this.revisar}</div>
-      <div class="fcard" id="fCard"><div class="fface ffr"><small>PERGUNTA</small><div>${esc(c.frente)}</div><em>Toque para ver a resposta</em></div><div class="fface fbk"><small>RESPOSTA</small><div>${esc(c.verso)}</div></div></div>
+      <div class="fc2" id="fCard"><div class="ffr2">${t ? `<span class="ftag" style="background:${cor}">${t[0]}</span>` : '<span class="ftag" style="background:var(--gold)">PERGUNTA</span>'}
+        <div class="fq"><span>${limpaCard(c.frente)}</span></div><em>Toque para ver a resposta</em></div>
+        <div class="fbk2 hidden" style="border-color:${cor}"><div class="fvt" style="background:${cor}">RESPOSTA</div>
+        <div class="fv" style="--fc:${cor}">${limpaCard(c.verso)}</div>
+        ${c.fonte || c.dica ? `<div class="fft">${c.fonte ? `<span class="fsrc">📌 ${esc(c.fonte)}</span>` : ''}${c.dica ? `<div class="fdica">🧠 <b>Gancho:</b> ${esc(c.dica)}</div>` : ''}</div>` : ''}</div></div>
       <div class="fbtns hidden" id="fBtns"><button class="btn rv" id="fRev">🔁 Revisar</button><button class="btn sb" id="fSab">✅ Sabia</button></div>`;
-    $('fCard').onclick = () => { $('fCard').classList.add('virado'); $('fBtns').classList.remove('hidden') };
+    $('fCard').onclick = () => { $('fCard').querySelector('.fbk2').classList.remove('hidden'); $('fCard').querySelector('em').classList.add('hidden'); $('fBtns').classList.remove('hidden') };
     $('fRev').onclick = () => this.marcar(c, false);
     $('fSab').onclick = () => this.marcar(c, true);
   },
