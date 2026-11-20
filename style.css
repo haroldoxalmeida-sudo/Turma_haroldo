@@ -182,7 +182,7 @@ button{font-family:inherit}
 .qbar{height:5px;background:#E3E7EF;border-radius:4px;overflow:hidden;margin-bottom:10px}
 .qbar div{height:5px;background:var(--gold)}
 .qmeta{font-size:12px;color:var(--grey);margin-bottom:10px}
-.qenun{font-size:15px;line-height:1.6;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.qenun{white-space:pre-line;font-size:15px;line-height:1.6;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 .qops{display:flex;flex-direction:column;gap:8px}
 .qops.ce{flex-direction:row}.qops.ce .qop{flex:1;justify-content:center;font-weight:700;font-size:15px}
 .qop{display:flex;gap:8px;text-align:left;align-items:flex-start;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:12px;font-size:14px;line-height:1.5;color:var(--ink);cursor:pointer;font-family:inherit}
@@ -299,3 +299,5 @@ a.dl{text-decoration:none;display:inline-block}
   .bx,.aula table,.mmb{break-inside:avoid}
   .ban{break-after:avoid}
 }
+
+.qcom .cbx>b:first-child{color:#9A7420}

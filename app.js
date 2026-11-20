@@ -677,7 +677,7 @@ const Jogo = {
   fechar() { $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
 };
 $('jFechar').onclick = () => fecharCamada(() => Jogo.fechar());
-const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>');
+const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>').replace(/&lt;br\s*\/?&gt;/g, '<br>');
 
 const Quiz = {
   async abrir(semana, matId, soErros) {
@@ -727,7 +727,7 @@ const Quiz = {
     const gab = q.tipo === 'ce' ? (q.gabarito === 'C' ? 'Certo' : 'Errado') : 'letra ' + q.gabarito;
     $('qFeed').innerHTML = `<div class="qres ${ok ? 'ok' : 'no'}">${ok ? '✅ Você acertou!' : '❌ Não foi dessa vez.'}</div>
       <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}
-      ${q.como_cobra ? `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>` : ''}
+      ${q.como_cobra ? (q.como_cobra.startsWith('<b>') ? `<p class="cbx">${limpaHtml(q.como_cobra)}</p>` : `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>`) : ''}
       ${q.armadilha ? `<p><b class="ar">Armadilha:</b> ${limpaHtml(q.armadilha)}</p>` : ''}
       <p class="qgab">Gabarito: ${gab}</p></div>
       <button class="btn" id="qProx">${this.i + 1 < this.fila.length ? 'Próxima questão ›' : 'Ver resultado'}</button>`;
