@@ -153,7 +153,7 @@ const Aluno = {
   async carregar() {
     const t = this.trilha;
     const [sem, mt, av, pm, ed, lei] = await Promise.all([
-      sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar').eq('trilha_id', t.id).order('numero'),
+      sb.from('semanas').select('id,numero,titulo,descricao,dias_para_liberar,plano').eq('trilha_id', t.id).order('numero'),
       sb.from('materiais').select('id,semana_id,titulo,categoria,ordem,storage_path,dia,disciplina').order('ordem'),
       sb.from('avisos').select('id,titulo,texto,link,trilha_id,criado_em').eq('ativo', true).or(`trilha_id.is.null,trilha_id.eq.${t.id}`).order('criado_em', { ascending: false }).limit(10),
       sb.from('progresso_materiais').select('material_id,concluido_em').eq('user_id', usuario.id),
@@ -232,22 +232,24 @@ const Aluno = {
   },
   // semana organizada em dias, com 2 disciplinas por dia
   dias(s) {
-    const temDia = s.itens.some(i => i.dia);
+    const temDia = s.itens.some(i => i.dia) || !!s.plano;
     if (!temDia) return s.itens.map(i => this.item(i)).join('');
     const fe = this.d.feitos, html = [];
     const prox = this.proxDia(s);
     for (let d = 1; d <= 6; d++) {
       const its = s.itens.filter(i => i.dia === d);
       const conta = its.filter(i => !EXTRAS.includes(i.categoria));
-      const discs = [...new Set(its.map(i => i.disciplina || 'Geral'))];
+      const plano = (s.plano && s.plano[d]) || [];
+      const discs = [...new Set([...plano, ...its.map(i => i.disciplina || 'Geral')])];
       const ok = conta.length && conta.every(i => fe.has(i.id));
-      const nomeDia = discs.length && its.length ? discs.join(' + ') : (DIA_NOME[d] || 'Em preparação');
+      const nomeDia = discs.length ? discs.join(' + ') : (DIA_NOME[d] || 'Em preparação');
       const k = 'd' + s.id + d, aberto = this.abertas[k] ?? (d === prox);
       let corpo = '';
       if (aberto) {
         if (!its.length) corpo = '<div class="wd" style="margin-top:8px">📦 O material deste dia está sendo preparado.</div>';
         else corpo = `<div class="rot">⏱ 4h · 15 min de revisão + 2 disciplinas (aula + questões)</div>` + discs.map(dn => {
           const di = its.filter(i => (i.disciplina || 'Geral') === dn);
+          if (!di.length) return `<div class="disc-h">${esc(dn)}</div><div class="wd" style="margin:4px 0 8px">📦 Material em preparação.</div>`;
           const mapas = di.filter(i => i.categoria === 'mapa');
           const princ = di.filter(i => i.categoria !== 'mapa').sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
           let usado = false;
@@ -330,7 +332,7 @@ const Aluno = {
       const aberto = this.abertas[s.id] ?? (idx === 0);
       return `<div class="card ${s === this.atual ? 'now' : s.concluida ? 'ok' : ''} semana"><button class="shead btnhead" data-toggle="${s.id}">
         <div class="dot">${s.concluida ? '✓' : s.numero}</div><div style="flex:1;text-align:left"><div class="wt">Semana ${s.numero} · ${esc(s.titulo)}</div><div class="wd">${s.feitosN}/${s.conta.length} concluídos</div></div><span class="seta">${aberto ? '▴' : '▾'}</span></button>
-        ${aberto ? (itens.length ? (this.filtro === 'todos' ? this.dias(s) : itens.map(i => this.item(i)).join('')) : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : ''}</div>`;
+        ${aberto ? (itens.length || (s.plano && this.filtro === 'todos') ? (this.filtro === 'todos' ? this.dias(s) : itens.map(i => this.item(i)).join('')) : '<div class="wd" style="margin-top:8px">Material em preparação.</div>') : ''}</div>`;
     }).join('');
     const bloq = this.d.semanas.filter(s => !s.aberta).length;
     if (bloq) html += `<div class="wd" style="text-align:center;margin:10px">🔒 Mais ${bloq} semana${bloq > 1 ? 's' : ''} chegando. Veja as datas no Início.</div>`;
