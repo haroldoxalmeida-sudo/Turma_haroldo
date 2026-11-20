@@ -12,6 +12,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let modo = 'entrar', usuario = null, ehAdmin = false, cfg = {}, trilhas = [], instalarEvt = null;
 
 // ---------- utilidades ----------
+// nome do arquivo que o aluno recebe ao baixar ou salvar em PDF
+const nomeArq = i => ['Haroldo Concurso', i.disciplina, String(i.titulo || 'Material').replace(/:\s*/g, ' - ')].filter(Boolean).join(' - ').replace(/[\\/?*"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hoje = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d };
 const dataLocal = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) };
@@ -232,9 +234,9 @@ const Aluno = {
       <div class="itx"><div class="icat">${ic} ${nome}</div><div class="inm">${esc(i.titulo)}</div></div>
       <div class="mb">${!i.storage_path && (i.categoria === 'questoes' || i.categoria === 'flashcards')
         ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : 'Praticar'}</button>`
-        : !i.storage_path ? `<button class="dl gold" data-aula="${i.id}" data-t="${esc(i.titulo)}">Ler aula</button>`
-        : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" aria-label="Baixar">⬇</button>`}</div></div>
-      ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span>${mapa.storage_path ? `<button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" aria-label="Baixar">⬇</button>` : `<button class="dl alt" data-aula="${mapa.id}" data-t="${esc(mapa.titulo)}">Ver</button>`}</div>` : ''}`;
+        : !i.storage_path ? `<button class="dl gold" data-aula="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}">Ler aula</button>`
+        : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}" aria-label="Baixar">⬇</button>`}</div></div>
+      ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span>${mapa.storage_path ? `<button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}" aria-label="Baixar">⬇</button>` : `<button class="dl alt" data-aula="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}">Ver</button>`}</div>` : ''}`;
   },
   // semana organizada em dias, com 2 disciplinas por dia
   dias(s) {
@@ -388,9 +390,9 @@ const Aluno = {
 
   // --- ações
   ligar(c) {
-    c.querySelectorAll('[data-ler]').forEach(b => b.onclick = () => Leitor.abrir(b.dataset.ler, b.dataset.t));
-    c.querySelectorAll('[data-aula]').forEach(b => b.onclick = () => Aula.abrir(b.dataset.aula, b.dataset.t));
-    c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.t));
+    c.querySelectorAll('[data-ler]').forEach(b => b.onclick = () => Leitor.abrir(b.dataset.ler, b.dataset.t, b.dataset.n));
+    c.querySelectorAll('[data-aula]').forEach(b => b.onclick = () => Aula.abrir(b.dataset.aula, b.dataset.t, b.dataset.n));
+    c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.n || b.dataset.t));
     c.querySelectorAll('[data-feito]').forEach(b => b.onclick = () => this.alternarFeito(b.dataset.feito, b));
     c.querySelectorAll('[data-jogo]').forEach(b => b.onclick = () => b.dataset.jogo === 'flashcards' ? Flash.abrir(b.dataset.sem, b.dataset.mat) : Quiz.abrir(b.dataset.sem, b.dataset.mat, b.dataset.jogo === 'erros'));
     c.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.ir(b.dataset.ir));
@@ -441,7 +443,7 @@ const Leitor = {
   salvar(blob, titulo) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (titulo || 'material').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + '.pdf';
+    a.download = (titulo || 'material').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\- ()]+/g, '').replace(/\s+/g, ' ').trim() + '.pdf';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
   },
@@ -455,8 +457,8 @@ const Leitor = {
     await new Promise((ok, erro) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = ok; s.onerror = erro; document.head.appendChild(s) });
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   },
-  async abrir(id, titulo) {
-    this.titulo = titulo; $('lTitulo').textContent = titulo;
+  async abrir(id, titulo, nome) {
+    this.titulo = nome || titulo; $('lTitulo').textContent = titulo;
     const box = $('lPages'); box.innerHTML = '<div class="lstatus">Preparando seu material…</div>';
     $('leitor').classList.remove('hidden'); document.body.style.overflow = 'hidden'; abrirCamada('leitor');
     try {
@@ -664,7 +666,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 // ---------- QUESTÕES INTERATIVAS ----------
 // ---------- AULA DENTRO DO SITE ----------
 const Aula = {
-  async abrir(id, titulo) {
+  async abrir(id, titulo, arquivo) {
     Jogo.abrir(titulo);
     const { data, error } = await sb.from('materiais').select('html').eq('id', id).maybeSingle();
     if (error || !data?.html) { $('jCorpo').innerHTML = '<div class="empty"><h3>Não foi possível abrir a aula.</h3><p>Verifique sua internet e tente de novo.</p></div>'; return }
@@ -676,7 +678,12 @@ const Aula = {
       <article class="aula">${html}<p class="uso">Material de uso exclusivo de ${marca}. Proibida a reprodução ou o compartilhamento.</p></article>`;
     $('jCorpo').scrollTop = 0;
     $('jCorpo').querySelectorAll('figure.esq').forEach(f => f.onclick = () => f.classList.toggle('zoom'));
-    $('aPdf').onclick = () => { document.body.classList.add('imprimindo'); setTimeout(() => { window.print(); document.body.classList.remove('imprimindo') }, 50) };
+    $('aPdf').onclick = () => {
+      // o navegador usa o título da página como nome do PDF salvo
+      const t0 = document.title; document.title = arquivo || titulo || t0;
+      document.body.classList.add('imprimindo');
+      setTimeout(() => { window.print(); document.body.classList.remove('imprimindo'); setTimeout(() => { document.title = t0 }, 1000) }, 50)
+    };
   }
 };
 
