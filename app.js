@@ -232,8 +232,8 @@ const Aluno = {
     return `<div class="item ${feito ? 'feito' : ''}">
       <button class="chk" data-feito="${i.id}" aria-label="Marcar como concluído">${feito ? '✓' : ''}</button>
       <div class="itx"><div class="icat">${ic} ${nome}</div><div class="inm">${esc(i.titulo)}</div></div>
-      <div class="mb">${!i.storage_path && (i.categoria === 'questoes' || i.categoria === 'flashcards')
-        ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : 'Praticar'}</button>`
+      <div class="mb">${!i.storage_path && (i.categoria === 'questoes' || i.categoria === 'flashcards' || i.categoria === 'simulado')
+        ? `<button class="dl gold" data-jogo="${i.categoria}" data-sem="${i.semana_id}" data-mat="${i.id}">${i.categoria === 'questoes' ? 'Resolver' : i.categoria === 'simulado' ? 'Fazer simulado' : 'Praticar'}</button>`
         : !i.storage_path ? `<button class="dl gold" data-aula="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}">Ler aula</button>`
         : `<button class="dl" data-ler="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}">Abrir</button><button class="dl alt ico" data-baixar="${i.id}" data-t="${esc(i.titulo)}" data-n="${esc(nomeArq(i))}" aria-label="Baixar">⬇</button>`}</div></div>
       ${mapa ? `<div class="extra"><span>🧠 Mapa mental <em>(extra)</em></span>${mapa.storage_path ? `<button class="dl alt" data-ler="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}">Ver</button><button class="dl alt ico" data-baixar="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}" aria-label="Baixar">⬇</button>` : `<button class="dl alt" data-aula="${mapa.id}" data-t="${esc(mapa.titulo)}" data-n="${esc(nomeArq(mapa))}">Ver</button>`}</div>` : ''}`;
@@ -255,7 +255,7 @@ const Aluno = {
       let corpo = '';
       if (aberto) {
         if (!its.length) corpo = '<div class="wd" style="margin-top:8px">📦 O material deste dia está sendo preparado.</div>';
-        else corpo = `<div class="rot">⏱ 4h · 15 min de revisão + 2 disciplinas (aula + questões)</div>` + discs.map(dn => {
+        else corpo = `<div class="rot">${d === 6 ? '⏱ 2h30 · simulado com as disciplinas da semana' : '⏱ 4h · 15 min de revisão + 2 disciplinas (aula + questões)'}</div>` + discs.map(dn => {
           const di = its.filter(i => (i.disciplina || 'Geral') === dn);
           if (!di.length) return `<div class="disc-h">${esc(dn)}</div><div class="wd" style="margin:4px 0 8px">📦 Material em preparação.</div>`;
           const mapas = di.filter(i => i.categoria === 'mapa');
@@ -394,7 +394,7 @@ const Aluno = {
     c.querySelectorAll('[data-aula]').forEach(b => b.onclick = () => Aula.abrir(b.dataset.aula, b.dataset.t, b.dataset.n));
     c.querySelectorAll('[data-baixar]').forEach(b => b.onclick = () => Leitor.baixarDireto(b, b.dataset.baixar, b.dataset.n || b.dataset.t));
     c.querySelectorAll('[data-feito]').forEach(b => b.onclick = () => this.alternarFeito(b.dataset.feito, b));
-    c.querySelectorAll('[data-jogo]').forEach(b => b.onclick = () => b.dataset.jogo === 'flashcards' ? Flash.abrir(b.dataset.sem, b.dataset.mat) : Quiz.abrir(b.dataset.sem, b.dataset.mat, b.dataset.jogo === 'erros'));
+    c.querySelectorAll('[data-jogo]').forEach(b => b.onclick = () => b.dataset.jogo === 'flashcards' ? Flash.abrir(b.dataset.sem, b.dataset.mat) : b.dataset.jogo === 'simulado' ? Prova.abrir(b.dataset.mat) : Quiz.abrir(b.dataset.sem, b.dataset.mat, b.dataset.jogo === 'erros'));
     c.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.ir(b.dataset.ir));
     c.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { this.filtro = b.dataset.filtro; this.render() });
     c.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const k = b.dataset.toggle; this.abertas[k] = !(this.abertas[k] ?? (this.aba === 'materiais' && this.d.semanas.filter(s => s.aberta).slice(-1)[0]?.id === k)); this.render() });
@@ -689,7 +689,7 @@ const Aula = {
 
 const Jogo = {
   abrir(titulo) { $('jTitulo').textContent = titulo; if ($('jogo').classList.contains('hidden')) abrirCamada('jogo'); $('jogo').classList.remove('hidden'); document.body.style.overflow = 'hidden'; $('jCorpo').innerHTML = '<div class="spin">Carregando…</div>' },
-  fechar() { $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
+  fechar() { clearInterval(Prova.tm); $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
 };
 $('jFechar').onclick = () => fecharCamada(() => Jogo.fechar());
 const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>').replace(/&lt;br\s*\/?&gt;/g, '<br>');
@@ -757,6 +757,129 @@ const Quiz = {
       ${ids.length - ac ? '<button class="btn" id="qErr2">Refazer as que errei</button>' : ''}<button class="btn sec2" id="qSair">Voltar</button></div>`;
     if ($('qErr2')) $('qErr2').onclick = () => { this.fila = this.fila.filter(x => !this.resp.get(x.id)?.acertou); this.mostrar(0) };
     $('qSair').onclick = () => fecharCamada(() => Jogo.fechar());
+  }
+};
+
+// ---------- SIMULADO (MODO PROVA) ----------
+const Prova = {
+  DUR: 150 * 60 * 1000,
+  chave() { return 'prova_' + usuario.id + '_' + this.matId },
+  salvar() { ls.set(this.chave(), JSON.stringify(this.st)) },
+  async abrir(matId) {
+    Jogo.abrir('Simulado'); this.matId = matId; clearInterval(this.tm);
+    const [{ data: qs }, { data: rs }] = await Promise.all([sb.from('questoes').select('*').eq('material_id', matId).order('ordem'), sb.from('respostas').select('questao_id,resposta,acertou').eq('user_id', usuario.id)]);
+    this.qs = qs || []; this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
+    try { this.st = JSON.parse(ls.get(this.chave()) || 'null') } catch { this.st = null }
+    if (!this.st && this.qs.length && this.qs.every(q => this.resp.has(q.id))) this.st = { ini: 0, fim: 0, marc: Object.fromEntries(this.qs.map(q => [q.id, this.resp.get(q.id).resposta])), entregue: true };
+    if (!this.qs.length) return Quiz.vazio('Simulado em preparação.');
+    if (this.st?.entregue) return this.resultado();
+    if (this.st?.ini) return this.mostrar(this.st.i || 0);
+    this.inicio();
+  },
+  disc(q) { return (q.assunto || 'Geral').split(' · ')[0] },
+  inicio() {
+    const n = this.qs.length, ce = this.qs.filter(q => q.tipo === 'ce').length;
+    $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:0"><span>${n}</span></div>
+      <h3>Simulado da semana</h3>
+      <p class="wd">${n} questões (${n - ce} de múltipla escolha e ${ce} de certo ou errado) · <b>2h30</b> de prova.</p>
+      <div class="pv-reg"><p>• Faça sem consulta, como no dia da prova.</p><p>• Você pode trocar a resposta e navegar entre as questões até entregar.</p><p>• O gabarito e os comentários aparecem <b>só depois de entregar</b>.</p><p>• 1 ponto por acerto; errada ou em branco vale zero; não há desconto.</p><p>• Ao fim do tempo, a prova é entregue automaticamente. Se fechar o app, o tempo continua correndo.</p></div>
+      <button class="btn" id="pIni">Começar o simulado</button></div>`;
+    $('pIni').onclick = () => { this.st = { ini: Date.now(), marc: {}, i: 0 }; this.salvar(); this.mostrar(0) };
+  },
+  resta() { return this.st.ini + this.DUR - Date.now() },
+  relogio() {
+    const r = this.resta(), el = $('pTimer');
+    if (!el) return clearInterval(this.tm);
+    if (r <= 0) { clearInterval(this.tm); return this.entregar(true) }
+    const t = Math.ceil(r / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sg = t % 60;
+    el.textContent = `⏱ ${h}:${String(m).padStart(2, '0')}:${String(sg).padStart(2, '0')}`;
+    el.classList.toggle('urg', r < 10 * 60 * 1000);
+  },
+  mostrar(i) {
+    if (this.resta() <= 0) return this.entregar(true);
+    this.st.i = i; this.salvar();
+    const q = this.qs[i], n = this.qs.length, marc = this.st.marc[q.id], resp = Object.keys(this.st.marc).length;
+    const ops = q.tipo === 'ce' ? [['C', 'Certo'], ['E', 'Errado']] : (q.alternativas || []).map((t, k) => ['ABCDE'[k], t]);
+    $('jCorpo').innerHTML = `<div class="pv-top"><span id="pTimer" class="pv-timer"></span><span class="wd">${resp}/${n} respondidas</span><button class="dl alt" id="pMapa">Questões</button></div>
+      <div id="pGrade" class="pv-grade hidden">${this.qs.map((x, k) => `<button class="pv-n ${this.st.marc[x.id] ? 'ok' : ''} ${k === i ? 'at' : ''}" data-ir="${k}">${k + 1}</button>`).join('')}</div>
+      <div class="qmeta">Questão ${i + 1} de ${n} · ${esc(this.disc(q))}${q.tipo === 'ce' ? ' · <b>Certo ou Errado</b>' : ''}</div>
+      ${q.texto_base ? `<details class="qtexto" ${i === 0 || this.qs[i - 1]?.texto_base !== q.texto_base ? 'open' : ''}><summary>📄 Leia o texto</summary><div>${esc(q.texto_base)}</div></details>` : ''}
+      <div class="qenun">${esc(q.enunciado)}</div>
+      <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop ${marc === L ? 'marc' : ''}" data-op="${L}"><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
+      <div class="pv-nav"><button class="btn sec2" id="pAnt" ${i ? '' : 'disabled'}>‹ Anterior</button><button class="btn" id="pProx">${i + 1 < n ? 'Próxima ›' : 'Revisar e entregar'}</button></div>
+      <button class="btn sec2" id="pEnt" style="margin-top:8px">Entregar o simulado</button>`;
+    $('jCorpo').scrollTop = 0; this.relogio(); clearInterval(this.tm); this.tm = setInterval(() => this.relogio(), 1000);
+    $('jCorpo').querySelectorAll('.qop').forEach(b => b.onclick = () => {
+      if (this.st.marc[q.id] === b.dataset.op) delete this.st.marc[q.id]; else this.st.marc[q.id] = b.dataset.op;
+      this.salvar(); this.mostrar(i);
+    });
+    $('pMapa').onclick = () => $('pGrade').classList.toggle('hidden');
+    $('jCorpo').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.mostrar(+b.dataset.ir));
+    $('pAnt').onclick = () => this.mostrar(i - 1);
+    $('pProx').onclick = () => i + 1 < n ? this.mostrar(i + 1) : this.confirmar();
+    $('pEnt').onclick = () => this.confirmar();
+  },
+  confirmar() {
+    const n = this.qs.length, br = this.qs.filter(q => !this.st.marc[q.id]).length;
+    $('jCorpo').innerHTML = `<div class="pv-top"><span id="pTimer" class="pv-timer"></span></div><div class="qstart">
+      <h3>Entregar o simulado?</h3><p class="wd">${br ? `Você deixou <b>${br}</b> ${br > 1 ? 'questões' : 'questão'} em branco.` : 'Você respondeu todas as questões.'} Depois de entregar, não dá para mudar as respostas.</p>
+      <button class="btn" id="pSim">Entregar agora</button><button class="btn sec2" id="pVolta">Voltar à prova</button>
+      ${br ? `<div class="pv-grade">${this.qs.map((x, k) => this.st.marc[x.id] ? '' : `<button class="pv-n" data-ir="${k}">${k + 1}</button>`).join('')}</div>` : ''}</div>`;
+    this.relogio();
+    $('pSim').onclick = () => this.entregar(false);
+    $('pVolta').onclick = () => this.mostrar(this.st.i || 0);
+    $('jCorpo').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => this.mostrar(+b.dataset.ir));
+  },
+  async entregar(auto) {
+    clearInterval(this.tm);
+    if (this.st.entregue) return this.resultado();
+    this.st.entregue = true; this.st.fim = Math.min(Date.now(), this.st.ini + this.DUR); this.st.auto = auto; this.salvar();
+    $('jCorpo').innerHTML = '<div class="spin">Corrigindo…</div>';
+    const linhas = this.qs.filter(q => this.st.marc[q.id]).map(q => {
+      const ant = this.resp.get(q.id), op = this.st.marc[q.id];
+      return { questao_id: q.id, resposta: op, acertou: op === q.gabarito, tentativas: (ant?.tentativas || 0) + 1, respondido_em: new Date().toISOString() };
+    });
+    if (linhas.length) { const r = await sb.from('respostas').upsert(linhas, { onConflict: 'user_id,questao_id' }); if (r.error) toast('Erro ao salvar: ' + r.error.message) }
+    linhas.forEach(l => this.resp.set(l.questao_id, l));
+    if (!Aluno.d.feitos.has(this.matId)) await sb.from('progresso_materiais').insert({ material_id: this.matId });
+    Jogo.mudou = true;
+    this.resultado();
+  },
+  resultado() {
+    const m = this.st.marc, n = this.qs.length, ac = this.qs.filter(q => m[q.id] === q.gabarito).length, pct = Math.round(ac / n * 100);
+    const por = {};
+    this.qs.forEach(q => { const d = this.disc(q); por[d] = por[d] || { t: 0, a: 0, b: 0 }; por[d].t++; if (m[q.id] === q.gabarito) por[d].a++; if (!m[q.id]) por[d].b++ });
+    const min = this.st.ini && this.st.fim ? Math.round((this.st.fim - this.st.ini) / 60000) : null;
+    $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:${pct}"><span>${ac}/${n}</span></div>
+      <h3>${pct >= 80 ? 'Excelente! 🔥' : pct >= 60 ? 'Bom resultado! 💪' : 'Continue treinando! 📚'}</h3>
+      <p class="wd">Você fez <b>${ac} pontos</b> de ${n} (${pct}%)${min !== null ? ` em ${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}` : ''}.${this.st.auto ? ' A prova foi entregue ao fim do tempo.' : ''}</p></div>
+      <div class="pv-tab"><div class="pv-row h"><span>Disciplina</span><span>Acertos</span><span>%</span></div>
+      ${Object.entries(por).map(([d, v]) => { const p = Math.round(v.a / v.t * 100); return `<div class="pv-row ${p < 60 ? 'low' : ''}"><span>${esc(d)}</span><span>${v.a}/${v.t}</span><span>${p}%</span></div>` }).join('')}</div>
+      <p class="wd" style="margin:8px 2px">São poucas questões por disciplina: use o quadro como orientação. Onde ficou abaixo de 60%, reveja a aula e os flashcards. Revise também os acertos que vieram de chute.</p>
+      <button class="btn" id="pRev">Ver gabarito e comentários</button>
+      <button class="btn sec2" id="pNovo">Refazer o simulado</button><button class="btn sec2" id="pSair">Voltar</button>`;
+    $('pRev').onclick = () => this.revisar(0);
+    $('pNovo').onclick = () => { ls.set(this.chave(), ''); this.st = null; this.inicio() };
+    $('pSair').onclick = () => fecharCamada(() => Jogo.fechar());
+  },
+  revisar(i) {
+    const q = this.qs[i], n = this.qs.length, marc = this.st.marc[q.id];
+    const ops = q.tipo === 'ce' ? [['C', 'Certo'], ['E', 'Errado']] : (q.alternativas || []).map((t, k) => ['ABCDE'[k], t]);
+    const gab = q.tipo === 'ce' ? (q.gabarito === 'C' ? 'Certo' : 'Errado') : 'letra ' + q.gabarito;
+    $('jCorpo').innerHTML = `<div class="qbar"><div style="width:${Math.round((i + 1) / n * 100)}%"></div></div>
+      <div class="qmeta">Correção · questão ${i + 1} de ${n}${q.assunto ? ' · ' + esc(q.assunto) : ''}</div>
+      ${q.texto_base ? `<details class="qtexto"><summary>📄 Leia o texto</summary><div>${esc(q.texto_base)}</div></details>` : ''}
+      <div class="qenun">${esc(q.enunciado)}</div>
+      <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop ${L === q.gabarito ? 'certa' : L === marc ? 'errada' : ''}" disabled><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
+      <div class="qres ${marc === q.gabarito ? 'ok' : 'no'}">${!marc ? '⬜ Em branco.' : marc === q.gabarito ? '✅ Você acertou.' : '❌ Você marcou ' + (q.tipo === 'ce' ? (marc === 'C' ? 'Certo' : 'Errado') : marc) + '.'}</div>
+      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}
+      ${q.como_cobra ? (q.como_cobra.startsWith('<b>') ? `<p class="cbx">${limpaHtml(q.como_cobra)}</p>` : `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>`) : ''}
+      ${q.armadilha ? `<p><b class="ar">Armadilha:</b> ${limpaHtml(q.armadilha)}</p>` : ''}
+      <p class="qgab">Gabarito: ${gab}</p></div>
+      <div class="pv-nav"><button class="btn sec2" id="rAnt" ${i ? '' : 'disabled'}>‹ Anterior</button><button class="btn" id="rProx">${i + 1 < n ? 'Próxima ›' : 'Ver resultado'}</button></div>`;
+    $('jCorpo').scrollTop = 0;
+    $('rAnt').onclick = () => this.revisar(i - 1);
+    $('rProx').onclick = () => i + 1 < n ? this.revisar(i + 1) : this.resultado();
   }
 };
 
