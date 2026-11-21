@@ -361,3 +361,32 @@ a.dl{text-decoration:none;display:inline-block}
 .pv-row{display:grid;grid-template-columns:1fr 70px 50px;padding:8px 12px;border-top:1px solid var(--line);font-size:14px}
 .pv-row.h{border-top:0;background:var(--navy);color:#fff;font-weight:600;font-size:12px}
 .pv-row.low span:last-child{color:var(--red);font-weight:700}
+
+/* amostra grátis */
+.ou{display:flex;align-items:center;gap:10px;margin:26px 0 0;color:#8FA0C0;font-size:12px}
+.ou:before,.ou:after{content:'';flex:1;height:1px;background:var(--line2)}
+.btn.demo{margin-top:12px;background:transparent;border:1.5px solid var(--gold);color:var(--gold)}
+.demo-sub{font-size:12px;color:#C8D1E3;text-align:center;margin-top:8px}
+.demo .chk{display:none}
+.dhero{background:linear-gradient(150deg,var(--navy),var(--navy2));color:#fff;border-radius:16px;padding:18px 16px;margin-bottom:14px}
+.dhero h2{font-size:20px;line-height:1.25;margin:6px 0 8px}
+.dhero p{font-size:14px;line-height:1.55;color:#E3E8F2}
+.dhero small{display:block;margin-top:10px;font-size:12px;line-height:1.45;color:#C8D1E3}
+.cta-k{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--gold)}
+.comof .cf{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.comof .cf:last-of-type{border-bottom:0}
+.comof .cf>span{font-size:22px;line-height:1.2}
+.comof .cf b{color:var(--navy);font-size:14px}
+.comof .cf p{font-size:13px;line-height:1.5;color:var(--grey);margin-top:2px}
+.cf-ext{margin-top:8px;background:var(--goldl);border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.5;color:var(--navy2)}
+.dia.lock{opacity:.72;background:#F7F8FB}
+.dia.lock .ddot{background:#A9B2C2}
+.dia.lock .wd{font-size:12px}
+.cta{background:#fff;border:2px solid var(--gold);border-radius:16px;padding:18px 16px;margin:16px 0 8px;text-align:center}
+.cta h3{color:var(--navy);font-size:18px;margin:4px 0 6px}
+.cta p{font-size:14px;line-height:1.5;color:var(--grey)}
+.cta ol{text-align:left;margin:12px auto 0;max-width:260px;padding-left:20px;font-size:13.5px;line-height:1.7;color:var(--navy2)}
+.cta .btn{margin-top:14px}
+.cta .wa{display:block;margin-top:10px}
+.jcorpo .cta{margin:18px 12px 24px}
+@media print{.cta,.demo-sub{display:none!important}}

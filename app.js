@@ -24,6 +24,99 @@ const diasAte = s => Math.round((dataLocal(s) - hoje()) / 864e5);
 function toast(t) { const e = document.createElement('div'); e.className = 'toast'; e.textContent = t; document.body.appendChild(e); setTimeout(() => e.remove(), 2800) }
 async function copiar(t) { try { await navigator.clipboard.writeText(t); toast('Copiado!') } catch { prompt('Copie:', t) } }
 
+// ---------- AMOSTRA GRÁTIS (visitante sem cadastro) ----------
+const WA_DEMO = 'https://wa.me/5565996818656?text=' + encodeURIComponent('Oi Haroldo! Vi a amostra grátis da Turma Carreiras Policiais e quero assinar.');
+const Demo = {
+  ativo: false, itens: null, abertas: { 1: true },
+  ctx: { d: { feitos: new Set() } },
+  async abrir() {
+    if (usuario) return;
+    this.ativo = true;
+    document.body.classList.remove('login');
+    $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
+    $('hello').textContent = 'Amostra grátis'; $('ttl').textContent = 'Conheça a Turma';
+    $('bPainel').classList.add('hidden'); $('bSair').textContent = 'Entrar';
+    $('nav').classList.add('hidden'); $('prog').classList.add('hidden');
+    window.scrollTo(0, 0);
+    const c = $('conteudo');
+    if (!this.itens) {
+      c.innerHTML = '<div class="spin">Carregando…</div>';
+      const { data, error } = await sb.from('materiais').select('id,semana_id,dia,disciplina,categoria,titulo,ordem,storage_path').eq('amostra', true);
+      if (error) { c.innerHTML = '<div class="empty"><p>Não foi possível carregar a amostra. Verifique sua internet e tente de novo.</p></div>'; return }
+      this.itens = data || [];
+    }
+    if (this.ativo) this.render();
+  },
+  sair(modo) {
+    this.ativo = false; $('bSair').textContent = 'Sair';
+    if (location.hash === '#amostra') history.replaceState(null, '', location.pathname + location.search);
+    document.body.classList.add('login'); $('app').classList.add('hidden'); $('auth').classList.remove('hidden');
+    if (modo) setModo(modo);
+    window.scrollTo(0, 0);
+  },
+  cta(final) {
+    if (usuario) return '';
+    return `<div class="cta ${final ? 'final' : ''}"><div class="cta-k">GOSTOU?</div><h3>Libere a trilha completa</h3>
+      <p>Assinatura mensal de <b>R$ 49,90</b> no Pix. Uma semana nova de estudos por vez, do Dia 1 ao simulado.</p>
+      <ol><li>Crie sua conta</li><li>Faça o Pix</li><li>O Haroldo libera seu acesso</li></ol>
+      <button class="btn" data-assinar>Criar minha conta</button>
+      <a class="wa" href="${WA_DEMO}" target="_blank" rel="noopener">Tirar dúvidas no WhatsApp</a></div>`;
+  },
+  render() {
+    const c = $('conteudo'), its = this.itens;
+    const como = [
+      ['🗓️', 'Uma semana por vez', 'Do Dia 1 ao Dia 5, cerca de 4 horas por dia, com 2 disciplinas. No Dia 6, o simulado semanal.'],
+      ['📘', 'Aula Completa', 'Teoria aprofundada no conteúdo do edital, com o texto da lei transcrito, jurisprudência separada e esquemas visuais. Leia no celular ou baixe em PDF.'],
+      ['✍️', 'Questões comentadas', 'Inéditas, no estilo da UFMT. Cada comentário é uma mini aula: por que a certa está certa, por que cada errada está errada, como a banca cobra e onde está a armadilha.'],
+      ['🃏', 'Flashcards', 'Revisão ativa da aula: cada card volta em 1, 3, 7, 15 e 30 dias, conforme você acerta.'],
+      ['🧠', 'Mapa mental', 'O resumo visual de cada aula, para revisar rápido.'],
+      ['🏆', 'Simulado semanal', '50 questões em 2h30 cronometradas, com nota por disciplina e gabarito comentado. Toda semana tem um novo.']
+    ];
+    const blocoDia = d => {
+      const di = its.filter(i => i.dia === d);
+      if (d >= 3 && d <= 5) return `<div class="dia lock"><div class="btnhead"><div class="ddot"><small>DIA</small>${d}</div>
+        <div class="dinfo"><div class="dlbl">Dia ${d}</div><div class="wd">Aula, questões e flashcards de mais 2 disciplinas</div></div>
+        <div class="dright"><span class="dpill soon">🔒 Assinantes</span></div></div></div>`;
+      const aberto = this.abertas[d] ?? false;
+      const discs = [...new Set(di.map(i => i.disciplina))];
+      const chips = d === 6 ? '<span class="dchip sim">🏆 Simulado semanal · 2h30</span>' : discs.map(dn => `<span class="dchip" style="--dc:${corDisc(dn)}">${esc(dn)}</span>`).join('');
+      let corpo = '';
+      if (aberto) {
+        if (d === 6) corpo = `<div class="rot">⏱ 50 questões das disciplinas da semana, em 2h30. Faça sem consulta, como no dia da prova: o gabarito comentado aparece depois que você entregar.</div>` + di.map(i => Aluno.item.call(this.ctx, i)).join('');
+        else corpo = `<div class="rot">⏱ Cerca de 4h · comece pela revisão dos flashcards do dia anterior e depois estude as 2 disciplinas (aula + questões).</div>` + discs.map(dn => {
+          const dd = di.filter(i => i.disciplina === dn), mapa = dd.find(i => i.categoria === 'mapa');
+          const princ = dd.filter(i => i.categoria !== 'mapa').sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
+          return `<div class="dsec" style="--dc:${corDisc(dn)}"><div class="disc-h"><i></i>${esc(dn)}</div>` + princ.map(i => Aluno.item.call(this.ctx, i, i.categoria === 'aula' ? mapa : null)).join('') + '</div>';
+        }).join('');
+      }
+      return `<div class="dia ${d === 6 ? 'd6' : ''} ${aberto ? 'aberto' : ''}"><button class="btnhead" data-dtog="${d}">
+        <div class="ddot"><small>DIA</small>${d}</div>
+        <div class="dinfo"><div class="dlbl">Dia ${d}</div><div class="dchips">${chips}</div></div>
+        <div class="dright"><span class="dpill hoje">Grátis</span><span class="seta">${aberto ? '▴' : '▾'}</span></div></button>${corpo}</div>`;
+    };
+    c.innerHTML = `<div class="demo">
+      <div class="dhero"><div class="cta-k">TURMA CARREIRAS POLICIAIS · PJC-MT</div>
+        <h2>Experimente antes de assinar</h2>
+        <p>O <b>Dia 1</b>, o <b>Dia 2</b> e o <b>simulado semanal</b> da Semana 1 estão abertos para você, sem cadastro. Use do mesmo jeito que o aluno usa: leia a aula, resolva as questões, pratique os flashcards e faça o simulado.</p>
+        <small>Preparação para Escrivão e Investigador (edital UFMT), com material feito pelo Haroldo, aprovado na Polícia Penal e na Polícia Civil.</small></div>
+      <div class="sec">Como funciona</div>
+      <div class="card comof">${como.map(([ic, t, d]) => `<div class="cf"><span>${ic}</span><div><b>${t}</b><p>${d}</p></div></div>`).join('')}
+        <div class="cf-ext">Na área do assinante você também tem: progresso da semana, <b>revisão do dia</b>, <b>caderno de erros</b>, <b>edital vivo</b> (marca os tópicos que já estudou) e legislação.</div></div>
+      <div class="sec">Semana 1 · amostra</div>
+      <div class="wd" style="margin:-4px 4px 10px">Toque em um dia para abrir. Nesta amostra, suas respostas não ficam salvas.</div>
+      <div class="dias">${[1, 2, 3, 4, 5, 6].map(blocoDia).join('')}</div>
+      ${this.cta(true)}</div>`;
+    c.querySelectorAll('[data-dtog]').forEach(b => b.onclick = () => { const d = +b.dataset.dtog; this.abertas[d] = !(this.abertas[d] ?? false); this.render() });
+    c.querySelectorAll('[data-aula]').forEach(b => b.onclick = () => Aula.abrir(b.dataset.aula, b.dataset.t, b.dataset.n));
+    c.querySelectorAll('[data-jogo]').forEach(b => b.onclick = () => b.dataset.jogo === 'flashcards' ? Flash.abrir(b.dataset.sem, b.dataset.mat) : b.dataset.jogo === 'simulado' ? Prova.abrir(b.dataset.mat) : Quiz.abrir(b.dataset.sem, b.dataset.mat, false));
+  }
+};
+document.addEventListener('click', e => {
+  if (!e.target.closest('[data-assinar]')) return;
+  if (!$('jogo').classList.contains('hidden')) Jogo.fechar();
+  Demo.sair('criar');
+});
+
 // ---------- login ----------
 function setModo(m) {
   modo = m;
@@ -66,10 +159,10 @@ $('bEsqueci').onclick = async () => {
   msg(error ? 'Não deu certo: ' + error.message : 'Enviamos um link para redefinir a senha no seu e-mail.', error ? 'err' : 'ok');
 };
 
-$('bSair').onclick = () => sb.auth.signOut();
+$('bSair').onclick = () => Demo.ativo ? Demo.sair('entrar') : sb.auth.signOut();
 $('bPainel').onclick = () => { location.hash = location.hash === '#painel' ? '#a-inicio' : '#painel' };
 document.querySelectorAll('#nav [data-nav]').forEach(b => b.onclick = () => Aluno.ir(b.dataset.nav));
-window.addEventListener('hashchange', () => usuario && rotear());
+window.addEventListener('hashchange', () => usuario ? rotear() : location.hash === '#amostra' ? Demo.abrir() : Demo.ativo && Demo.sair());
 
 sb.auth.onAuthStateChange(async (ev, session) => {
   if (ev === 'PASSWORD_RECOVERY') {
@@ -82,8 +175,10 @@ sb.auth.onAuthStateChange(async (ev, session) => {
   if (session) {
     $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
     if (novo) iniciar();
-  } else { $('app').classList.add('hidden'); $('auth').classList.remove('hidden') }
+  } else if (location.hash === '#amostra') Demo.abrir();
+  else { Demo.ativo = false; $('app').classList.add('hidden'); $('auth').classList.remove('hidden') }
 });
+$('bDemo').onclick = () => { location.hash = '#amostra'; Demo.abrir() };
 
 async function iniciar() {
   const nome = (usuario.user_metadata?.nome || '').split(' ')[0];
@@ -684,10 +779,10 @@ const Aula = {
     if (error || !data?.html) { $('jCorpo').innerHTML = '<div class="empty"><h3>Não foi possível abrir a aula.</h3><p>Verifique sua internet e tente de novo.</p></div>'; return }
     let html = data.html;
     if (html.startsWith('gz:')) { const bin = Uint8Array.from(atob(html.slice(3)), c => c.charCodeAt(0)); html = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text() }
-    const nome = usuario.user_metadata?.nome || '', marca = esc(`${nome} · ${usuario.email}`);
+    const marca = usuario ? esc(`${usuario.user_metadata?.nome || ''} · ${usuario.email}`) : 'Amostra grátis · Haroldo Concurso';
     $('jCorpo').innerHTML = `<div class="aulabar"><span>Leia aqui ou salve em PDF para estudar offline.</span><button class="dl gold" id="aPdf">Baixar PDF</button></div>
       <div class="wm" aria-hidden="true">${Array(40).fill(`<span>${marca}</span>`).join('')}</div>
-      <article class="aula">${html}<p class="uso">Material de uso exclusivo de ${marca}. Proibida a reprodução ou o compartilhamento.</p></article>`;
+      <article class="aula">${html}<p class="uso">${usuario ? `Material de uso exclusivo de ${marca}.` : 'Amostra grátis da Turma Carreiras Policiais.'} Proibida a reprodução ou o compartilhamento.</p></article>${Demo.cta()}`;
     $('jCorpo').scrollTop = 0;
     $('jCorpo').querySelectorAll('figure.esq').forEach(f => f.onclick = () => f.classList.toggle('zoom'));
     $('aPdf').onclick = () => {
@@ -701,7 +796,7 @@ const Aula = {
 
 const Jogo = {
   abrir(titulo) { $('jTitulo').textContent = titulo; if ($('jogo').classList.contains('hidden')) abrirCamada('jogo'); $('jogo').classList.remove('hidden'); document.body.style.overflow = 'hidden'; $('jCorpo').innerHTML = '<div class="spin">Carregando…</div>' },
-  fechar() { clearInterval(Prova.tm); $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
+  fechar() { clearInterval(Prova.tm); $('jogo').classList.add('hidden'); document.body.style.overflow = ''; if (Jogo.mudou && usuario) { Jogo.mudou = false; Aluno.carregar().then(() => Aluno.render()) } }
 };
 $('jFechar').onclick = () => fecharCamada(() => Jogo.fechar());
 const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>').replace(/&lt;br\s*\/?&gt;/g, '<br>');
@@ -724,7 +819,7 @@ const Quiz = {
     this.matId = matId; this.soErros = soErros;
     let q = sb.from('questoes').select('*').order('ordem');
     q = semana === 'todas' ? filtroLib(q, Aluno.d.libIds, Aluno.d.libLig) : matId ? q.eq('material_id', matId) : q.eq('semana_id', semana);
-    const [{ data: qs }, { data: rs }] = await Promise.all([q, sb.from('respostas').select('questao_id,resposta,acertou,tentativas').eq('user_id', usuario.id)]);
+    const [{ data: qs }, { data: rs }] = await Promise.all([q, usuario ? sb.from('respostas').select('questao_id,resposta,acertou,tentativas').eq('user_id', usuario.id) : { data: [] }]);
     this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
     this.todas = qs || [];
     if (soErros) { this.fila = this.todas.filter(x => this.resp.get(x.id)?.acertou === false); return this.fila.length ? this.mostrar(0) : this.vazio('Seu caderno de erros está vazio. 🎉') }
@@ -761,7 +856,7 @@ const Quiz = {
     const ant = this.resp.get(q.id);
     const linha = { questao_id: q.id, resposta: op, acertou: ok, tentativas: (ant?.tentativas || 0) + 1, respondido_em: new Date().toISOString() };
     this.resp.set(q.id, linha); Jogo.mudou = true;
-    sb.from('respostas').upsert(linha, { onConflict: 'user_id,questao_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
+    if (usuario) sb.from('respostas').upsert(linha, { onConflict: 'user_id,questao_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
     const gab = q.tipo === 'ce' ? (q.gabarito === 'C' ? 'Certo' : 'Errado') : 'letra ' + q.gabarito;
     $('qFeed').innerHTML = `<div class="qres ${ok ? 'ok' : 'no'}">${ok ? '✅ Você acertou!' : '❌ Não foi dessa vez.'}</div>
       <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}<div class="qesq"></div>
@@ -775,11 +870,11 @@ const Quiz = {
   },
   async fim() {
     const ids = this.fila.map(x => x.id), ac = ids.filter(id => this.resp.get(id)?.acertou).length, pct = ids.length ? Math.round(ac / ids.length * 100) : 0;
-    if (this.matId && this.todas.every(x => this.resp.has(x.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
+    if (usuario && this.matId && this.todas.every(x => this.resp.has(x.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
     $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:${pct}"><span>${pct}%</span></div>
       <h3>${pct >= 80 ? 'Excelente! 🔥' : pct >= 60 ? 'Bom resultado! 💪' : 'Continue treinando! 📚'}</h3>
-      <p class="wd">Você acertou ${ac} de ${ids.length} nesta rodada.${ids.length - ac ? ' As que você errou foram para o seu Caderno de erros.' : ''}</p>
-      ${ids.length - ac ? '<button class="btn" id="qErr2">Refazer as que errei</button>' : ''}<button class="btn sec2" id="qSair">Voltar</button></div>`;
+      <p class="wd">Você acertou ${ac} de ${ids.length} nesta rodada.${ids.length - ac ? (usuario ? ' As que você errou foram para o seu Caderno de erros.' : ' Na assinatura, as que você errou vão para o seu Caderno de erros.') : ''}</p>
+      ${ids.length - ac ? '<button class="btn" id="qErr2">Refazer as que errei</button>' : ''}<button class="btn sec2" id="qSair">Voltar</button></div>${Demo.cta()}`;
     if ($('qErr2')) $('qErr2').onclick = () => { this.fila = this.fila.filter(x => !this.resp.get(x.id)?.acertou); this.mostrar(0) };
     $('qSair').onclick = () => fecharCamada(() => Jogo.fechar());
   }
@@ -788,11 +883,11 @@ const Quiz = {
 // ---------- SIMULADO (MODO PROVA) ----------
 const Prova = {
   DUR: 150 * 60 * 1000,
-  chave() { return 'prova_' + usuario.id + '_' + this.matId },
+  chave() { return 'prova_' + (usuario ? usuario.id : 'amostra') + '_' + this.matId },
   salvar() { ls.set(this.chave(), JSON.stringify(this.st)) },
   async abrir(matId) {
     Jogo.abrir('Simulado'); this.matId = matId; clearInterval(this.tm);
-    const [{ data: qs }, { data: rs }] = await Promise.all([sb.from('questoes').select('*').eq('material_id', matId).order('ordem'), sb.from('respostas').select('questao_id,resposta,acertou').eq('user_id', usuario.id)]);
+    const [{ data: qs }, { data: rs }] = await Promise.all([sb.from('questoes').select('*').eq('material_id', matId).order('ordem'), usuario ? sb.from('respostas').select('questao_id,resposta,acertou').eq('user_id', usuario.id) : { data: [] }]);
     this.qs = qs || []; this.resp = new Map((rs || []).map(r => [r.questao_id, r]));
     try { this.st = JSON.parse(ls.get(this.chave()) || 'null') } catch { this.st = null }
     if (!this.st && this.qs.length && this.qs.every(q => this.resp.has(q.id))) this.st = { ini: 0, fim: 0, marc: Object.fromEntries(this.qs.map(q => [q.id, this.resp.get(q.id).resposta])), entregue: true };
@@ -805,7 +900,7 @@ const Prova = {
   inicio() {
     const n = this.qs.length, ce = this.qs.filter(q => q.tipo === 'ce').length;
     $('jCorpo').innerHTML = `<div class="qstart"><div class="ring" style="--p:0"><span>${n}</span></div>
-      <h3>Simulado da semana</h3>
+      <h3>Simulado semanal</h3>
       <p class="wd">${n} questões (${n - ce} de múltipla escolha e ${ce} de certo ou errado) · <b>2h30</b> de prova.</p>
       <div class="pv-reg"><p>• Faça sem consulta, como no dia da prova.</p><p>• Você pode trocar a resposta e navegar entre as questões até entregar.</p><p>• O gabarito e os comentários aparecem <b>só depois de entregar</b>.</p><p>• 1 ponto por acerto; errada ou em branco vale zero; não há desconto.</p><p>• Ao fim do tempo, a prova é entregue automaticamente. Se fechar o app, o tempo continua correndo.</p></div>
       <button class="btn" id="pIni">Começar o simulado</button></div>`;
@@ -864,9 +959,9 @@ const Prova = {
       const ant = this.resp.get(q.id), op = this.st.marc[q.id];
       return { questao_id: q.id, resposta: op, acertou: op === q.gabarito, tentativas: (ant?.tentativas || 0) + 1, respondido_em: new Date().toISOString() };
     });
-    if (linhas.length) { const r = await sb.from('respostas').upsert(linhas, { onConflict: 'user_id,questao_id' }); if (r.error) toast('Erro ao salvar: ' + r.error.message) }
+    if (linhas.length && usuario) { const r = await sb.from('respostas').upsert(linhas, { onConflict: 'user_id,questao_id' }); if (r.error) toast('Erro ao salvar: ' + r.error.message) }
     linhas.forEach(l => this.resp.set(l.questao_id, l));
-    if (!Aluno.d.feitos.has(this.matId)) await sb.from('progresso_materiais').insert({ material_id: this.matId });
+    if (usuario && !Aluno.d.feitos.has(this.matId)) await sb.from('progresso_materiais').insert({ material_id: this.matId });
     Jogo.mudou = true;
     this.resultado();
   },
@@ -882,7 +977,7 @@ const Prova = {
       ${Object.entries(por).map(([d, v]) => { const p = Math.round(v.a / v.t * 100); return `<div class="pv-row ${p < 60 ? 'low' : ''}"><span>${esc(d)}</span><span>${v.a}/${v.t}</span><span>${p}%</span></div>` }).join('')}</div>
       <p class="wd" style="margin:8px 2px">São poucas questões por disciplina: use o quadro como orientação. Onde ficou abaixo de 60%, reveja a aula e os flashcards. Revise também os acertos que vieram de chute.</p>
       <button class="btn" id="pRev">Ver gabarito e comentários</button>
-      <button class="btn sec2" id="pNovo">Refazer o simulado</button><button class="btn sec2" id="pSair">Voltar</button>`;
+      <button class="btn sec2" id="pNovo">Refazer o simulado</button><button class="btn sec2" id="pSair">Voltar</button>${Demo.cta()}`;
     $('pRev').onclick = () => this.revisar(0);
     $('pNovo').onclick = () => { ls.set(this.chave(), ''); this.st = null; this.inicio() };
     $('pSair').onclick = () => fecharCamada(() => Jogo.fechar());
@@ -918,7 +1013,7 @@ const Flash = {
     Jogo.abrir('Flashcards'); this.matId = matId;
     let q = sb.from('flashcards').select('*').order('ordem');
     q = semana === 'todas' ? filtroLib(q, Aluno.d.libIds, Aluno.d.libLig) : matId ? q.eq('material_id', matId) : q.eq('semana_id', semana);
-    const [{ data: cs }, { data: rv }] = await Promise.all([q, sb.from('flash_revisao').select('card_id,caixa,proxima').eq('user_id', usuario.id)]);
+    const [{ data: cs }, { data: rv }] = await Promise.all([q, usuario ? sb.from('flash_revisao').select('card_id,caixa,proxima').eq('user_id', usuario.id) : { data: [] }]);
     this.rev = new Map((rv || []).map(r => [r.card_id, r])); this.cards = cs || [];
     const h = iso(hoje());
     const dev = this.cards.filter(c => !this.rev.has(c.id) || this.rev.get(c.id).proxima <= h);
@@ -950,16 +1045,16 @@ const Flash = {
     const prox = iso(addDias(hoje(), sabia ? INTERVALOS[cx] : 0));
     const linha = { card_id: c.id, caixa: cx, proxima: prox, atualizado_em: new Date().toISOString() };
     this.rev.set(c.id, linha); Jogo.mudou = true;
-    sb.from('flash_revisao').upsert(linha, { onConflict: 'user_id,card_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
+    if (usuario) sb.from('flash_revisao').upsert(linha, { onConflict: 'user_id,card_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
     this.fila.shift();
     if (sabia) this.feitos++; else { this.revisar++; this.fila.push(c) }
     this.mostrar();
   },
   async fim() {
-    if (this.matId && this.cards.every(c => this.rev.has(c.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
+    if (usuario && this.matId && this.cards.every(c => this.rev.has(c.id)) && !Aluno.d.feitos.has(this.matId)) { await sb.from('progresso_materiais').insert({ material_id: this.matId }); Jogo.mudou = true }
     $('jCorpo').innerHTML = `<div class="qstart"><div style="font-size:48px">🎉</div><h3>Sessão concluída!</h3>
-      <p class="wd">Os cards voltam para revisão em 1, 3, 7, 15 e 30 dias, conforme você for acertando. Fique de olho na <b>Revisão do dia</b> no Início.</p>
-      <button class="btn" id="fSair">Voltar</button></div>`;
+      <p class="wd">${usuario ? 'Os cards voltam para revisão em 1, 3, 7, 15 e 30 dias, conforme você for acertando. Fique de olho na <b>Revisão do dia</b> no Início.' : 'Na assinatura, os cards voltam sozinhos para revisão em 1, 3, 7, 15 e 30 dias, conforme você for acertando.'}</p>
+      <button class="btn" id="fSair">Voltar</button></div>${Demo.cta()}`;
     $('fSair').onclick = () => fecharCamada(() => Jogo.fechar());
   }
 };
