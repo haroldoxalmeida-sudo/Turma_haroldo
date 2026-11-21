@@ -709,6 +709,18 @@ const Jogo = {
 $('jFechar').onclick = () => fecharCamada(() => Jogo.fechar());
 const limpaHtml = s => esc(s || '').replace(/&lt;(\/?)(b|i|p)&gt;/g, '<$1$2>').replace(/&lt;br\s*\/?&gt;/g, '<br>');
 
+// esquema visual da questão (SVG guardado compactado, "gz:")
+async function esquemaQ(q, alvo) {
+  if (!q.esquema || !alvo) return;
+  try {
+    let s = q.esquema;
+    if (s.startsWith('gz:')) { const bin = Uint8Array.from(atob(s.slice(3)), c => c.charCodeAt(0)); s = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text() }
+    if (!s.trim().startsWith('<svg')) return;
+    alvo.innerHTML = `<figure class="esq"><figcaption><b>ESQUEMA</b> | ${esc(q.esquema_titulo || '')}</figcaption>${s}</figure>`;
+    alvo.querySelector('figure').onclick = e => e.currentTarget.classList.toggle('zoom');
+  } catch (e) { }
+}
+
 const Quiz = {
   async abrir(semana, matId, soErros) {
     Jogo.abrir(soErros ? 'Caderno de erros' : 'Questões comentadas');
@@ -755,12 +767,13 @@ const Quiz = {
     sb.from('respostas').upsert(linha, { onConflict: 'user_id,questao_id' }).then(r => r.error && toast('Erro ao salvar: ' + r.error.message));
     const gab = q.tipo === 'ce' ? (q.gabarito === 'C' ? 'Certo' : 'Errado') : 'letra ' + q.gabarito;
     $('qFeed').innerHTML = `<div class="qres ${ok ? 'ok' : 'no'}">${ok ? '✅ Você acertou!' : '❌ Não foi dessa vez.'}</div>
-      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}
+      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}<div class="qesq"></div>
       ${q.como_cobra ? (q.como_cobra.startsWith('<b>') ? `<p class="cbx">${limpaHtml(q.como_cobra)}</p>` : `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>`) : ''}
       ${q.armadilha ? `<p><b class="ar">Armadilha:</b> ${limpaHtml(q.armadilha)}</p>` : ''}
       <p class="qgab">Gabarito: ${gab}</p></div>
       <button class="btn" id="qProx">${this.i + 1 < this.fila.length ? 'Próxima questão ›' : 'Ver resultado'}</button>`;
     $('qProx').onclick = () => this.mostrar(this.i + 1);
+    esquemaQ(q, $('qFeed').querySelector('.qesq'));
     $('qFeed').scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
   async fim() {
@@ -887,7 +900,7 @@ const Prova = {
       <div class="qenun">${esc(q.enunciado)}</div>
       <div class="qops ${q.tipo === 'ce' ? 'ce' : ''}">${ops.map(([L, t]) => `<button class="qop ${L === q.gabarito ? 'certa' : L === marc ? 'errada' : ''}" disabled><b>${q.tipo === 'ce' ? '' : L + ')'}</b> <span>${esc(t)}</span></button>`).join('')}</div>
       <div class="qres ${marc === q.gabarito ? 'ok' : 'no'}">${!marc ? '⬜ Em branco.' : marc === q.gabarito ? '✅ Você acertou.' : '❌ Você marcou ' + (q.tipo === 'ce' ? (marc === 'C' ? 'Certo' : 'Errado') : marc) + '.'}</div>
-      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}
+      <div class="qcom"><div class="qct">Comentário</div>${limpaHtml(q.comentario)}<div class="qesq"></div>
       ${q.como_cobra ? (q.como_cobra.startsWith('<b>') ? `<p class="cbx">${limpaHtml(q.como_cobra)}</p>` : `<p><b class="cb">Como a banca cobra:</b> ${limpaHtml(q.como_cobra)}</p>`) : ''}
       ${q.armadilha ? `<p><b class="ar">Armadilha:</b> ${limpaHtml(q.armadilha)}</p>` : ''}
       <p class="qgab">Gabarito: ${gab}</p></div>
@@ -895,6 +908,7 @@ const Prova = {
     $('jCorpo').scrollTop = 0;
     $('rAnt').onclick = () => this.revisar(i - 1);
     $('rProx').onclick = () => i + 1 < n ? this.revisar(i + 1) : this.resultado();
+    esquemaQ(q, $('jCorpo').querySelector('.qesq'));
   }
 };
 
