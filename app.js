@@ -246,7 +246,6 @@ const Aluno = {
     if (!temDia) return s.itens.map(i => this.item(i)).join('');
     const fe = this.d.feitos, html = [];
     const prox = this.proxDia(s);
-    const SEMD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
     for (let d = 1; d <= 6; d++) {
       const its = s.itens.filter(i => i.dia === d);
       const conta = its.filter(i => !EXTRAS.includes(i.categoria));
@@ -255,8 +254,6 @@ const Aluno = {
       const discs = d === 6 ? [] : [...new Set([...plano, ...its.map(i => i.disciplina || 'Geral')])];
       const ok = conta.length && feitosD === conta.length;
       const k = 'd' + s.id + d, aberto = this.abertas[k] ?? (d === prox);
-      const data = s.lib ? addDias(s.lib, d - 1) : null;
-      const quando = data ? `${SEMD[data.getDay()]}, ${fmt(data)}` : '';
       const estado = ok ? 'ok' : d === prox ? 'hoje' : '';
       const pill = ok ? '<span class="dpill ok">✓ Concluído</span>' : d === prox ? '<span class="dpill hoje">Hoje</span>' : conta.length ? `<span class="dpill">${feitosD}/${conta.length}</span>` : '<span class="dpill soon">Em breve</span>';
       const chips = d === 6 ? '<span class="dchip sim">🏆 Simulado semanal · 2h30</span>' : discs.map(dn => `<span class="dchip" style="--dc:${corDisc(dn)}">${esc(dn)}</span>`).join('');
@@ -278,7 +275,7 @@ const Aluno = {
       const pct = conta.length ? Math.round(feitosD / conta.length * 100) : 0;
       html.push(`<div class="dia ${estado} ${d === 6 ? 'd6' : ''} ${aberto ? 'aberto' : ''}"><button class="btnhead" data-toggle="${k}">
         <div class="ddot"><small>DIA</small>${ok ? '✓' : d}</div>
-        <div class="dinfo"><div class="dlbl">Dia ${d}${quando ? ` · ${quando}` : ''}</div><div class="dchips">${chips}</div></div>
+        <div class="dinfo"><div class="dlbl">Dia ${d}</div><div class="dchips">${chips}</div></div>
         <div class="dright">${pill}<span class="seta">${aberto ? '▴' : '▾'}</span></div></button>
         ${conta.length && !ok ? `<div class="dbar"><div style="width:${pct}%"></div></div>` : ''}${corpo}</div>`);
     }
