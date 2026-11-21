@@ -109,6 +109,8 @@ const CAT = {
 const ORDEM_CAT = ['aula', 'legislacao', 'mapa', 'questoes', 'flashcards', 'simulado', 'extra'];
 const EXTRAS = ['mapa', 'extra'];
 const DIA_NOME = { 6: 'Simulado da semana' };
+const CORES_DISC = { 'Língua Portuguesa': '#2F6FB2', 'Direito Penal': '#B3261E', 'Processo Penal': '#8E3B8E', 'Direito Constitucional': '#1E7A4F', 'Direito Administrativo': '#C97A1F', 'Informática': '#0E8A8A', 'Raciocínio Lógico': '#5B4FC9' };
+const corDisc = n => CORES_DISC[n] || ['#2F6FB2', '#1E7A4F', '#C97A1F', '#8E3B8E', '#0E8A8A', '#5B4FC9', '#B3261E'][[...String(n)].reduce((a, c) => a + c.charCodeAt(0), 0) % 7];
 // semanas liberadas + aulas reaproveitadas de outros cursos (catálogo)
 const filtroLib = (q, sem, mats) => mats && mats.length ? q.or(`semana_id.in.(${sem.join(',')}),material_id.in.(${mats.join(',')})`) : q.in('semana_id', sem);
 const ls = { get: k => { try { return localStorage.getItem(k) } catch { return null } }, set: (k, v) => { try { localStorage.setItem(k, v) } catch { } } };
@@ -244,32 +246,45 @@ const Aluno = {
     if (!temDia) return s.itens.map(i => this.item(i)).join('');
     const fe = this.d.feitos, html = [];
     const prox = this.proxDia(s);
+    const SEMD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
     for (let d = 1; d <= 6; d++) {
       const its = s.itens.filter(i => i.dia === d);
       const conta = its.filter(i => !EXTRAS.includes(i.categoria));
-      const plano = (s.plano && s.plano[d]) || [];
-      const discs = [...new Set([...plano, ...its.map(i => i.disciplina || 'Geral')])];
-      const ok = conta.length && conta.every(i => fe.has(i.id));
-      const nomeDia = discs.length ? discs.join(' + ') : (DIA_NOME[d] || 'Em preparação');
+      const feitosD = conta.filter(i => fe.has(i.id)).length;
+      const plano = d === 6 ? [] : ((s.plano && s.plano[d]) || []);
+      const discs = d === 6 ? [] : [...new Set([...plano, ...its.map(i => i.disciplina || 'Geral')])];
+      const ok = conta.length && feitosD === conta.length;
       const k = 'd' + s.id + d, aberto = this.abertas[k] ?? (d === prox);
+      const data = s.lib ? addDias(s.lib, d - 1) : null;
+      const quando = data ? `${SEMD[data.getDay()]}, ${fmt(data)}` : '';
+      const estado = ok ? 'ok' : d === prox ? 'hoje' : '';
+      const pill = ok ? '<span class="dpill ok">✓ Concluído</span>' : d === prox ? '<span class="dpill hoje">Hoje</span>' : conta.length ? `<span class="dpill">${feitosD}/${conta.length}</span>` : '<span class="dpill soon">Em breve</span>';
+      const chips = d === 6 ? '<span class="dchip sim">🏆 Simulado semanal · 2h30</span>' : discs.map(dn => `<span class="dchip" style="--dc:${corDisc(dn)}">${esc(dn)}</span>`).join('');
       let corpo = '';
       if (aberto) {
-        if (!its.length) corpo = '<div class="wd" style="margin-top:8px">📦 O material deste dia está sendo preparado.</div>';
-        else corpo = `<div class="rot">${d === 6 ? '⏱ 2h30 · simulado com as disciplinas da semana' : '⏱ 4h · 15 min de revisão + 2 disciplinas (aula + questões)'}</div>` + discs.map(dn => {
+        if (!its.length) corpo = '<div class="wd dvazio">📦 O material deste dia está sendo preparado.</div>';
+        else if (d === 6) corpo = `<div class="rot">⏱ Reserve 2h30 sem interrupção. O gabarito comentado aparece depois que você entregar.</div>` + its.map(i => this.item(i)).join('');
+        else corpo = `<div class="rot">⏱ Cerca de 4h · comece pela revisão dos flashcards e depois estude as 2 disciplinas (aula + questões).</div>` + discs.map(dn => {
           const di = its.filter(i => (i.disciplina || 'Geral') === dn);
-          if (!di.length) return `<div class="disc-h">${esc(dn)}</div><div class="wd" style="margin:4px 0 8px">📦 Material em preparação.</div>`;
+          const cor = corDisc(dn);
+          if (!di.length) return `<div class="dsec" style="--dc:${cor}"><div class="disc-h"><i></i>${esc(dn)}</div><div class="wd" style="margin:4px 0 2px">📦 Material em preparação.</div></div>`;
           const mapas = di.filter(i => i.categoria === 'mapa');
           const princ = di.filter(i => i.categoria !== 'mapa').sort((a, b) => ORDEM_CAT.indexOf(a.categoria) - ORDEM_CAT.indexOf(b.categoria) || a.ordem - b.ordem);
+          const cf = princ.filter(i => fe.has(i.id)).length;
           let usado = false;
-          return `<div class="disc-h">${esc(dn)}</div>` + princ.map(i => { const m = !usado && i.categoria === 'aula' ? mapas[0] : null; if (m) usado = true; return this.item(i, m) }).join('') + (!usado ? mapas.map(m => this.item(m)).join('') : '');
+          return `<div class="dsec" style="--dc:${cor}"><div class="disc-h"><i></i>${esc(dn)}<span>${cf}/${princ.length}</span></div>` + princ.map(i => { const m = !usado && i.categoria === 'aula' ? mapas[0] : null; if (m) usado = true; return this.item(i, m) }).join('') + (!usado ? mapas.map(m => this.item(m)).join('') : '') + '</div>';
         }).join('');
       }
-      html.push(`<div class="dia ${ok ? 'ok' : ''} ${d === prox ? 'hoje' : ''}"><button class="btnhead" data-toggle="${k}">
-        <div class="ddot">${ok ? '✓' : d}</div><div style="flex:1;text-align:left"><div class="dlbl">Dia ${d}</div><div class="dnm">${esc(nomeDia)}</div></div>${d === prox && !ok ? '<span class="tag new">hoje</span>' : ''}<span class="seta">${aberto ? '▴' : '▾'}</span></button>${corpo}</div>`);
+      const pct = conta.length ? Math.round(feitosD / conta.length * 100) : 0;
+      html.push(`<div class="dia ${estado} ${d === 6 ? 'd6' : ''} ${aberto ? 'aberto' : ''}"><button class="btnhead" data-toggle="${k}">
+        <div class="ddot"><small>DIA</small>${ok ? '✓' : d}</div>
+        <div class="dinfo"><div class="dlbl">Dia ${d}${quando ? ` · ${quando}` : ''}</div><div class="dchips">${chips}</div></div>
+        <div class="dright">${pill}<span class="seta">${aberto ? '▴' : '▾'}</span></div></button>
+        ${conta.length && !ok ? `<div class="dbar"><div style="width:${pct}%"></div></div>` : ''}${corpo}</div>`);
     }
     const sem = s.itens.filter(i => !i.dia);
-    if (sem.length) html.push(`<div class="disc-h">Extras da semana</div>` + sem.map(i => this.item(i)).join(''));
-    return html.join('');
+    if (sem.length) html.push(`<div class="disc-h" style="margin-top:14px">Extras da semana</div>` + sem.map(i => this.item(i)).join(''));
+    return `<div class="dias">${html.join('')}</div>`;
   },
   proxDia(s) {
     for (let d = 1; d <= 6; d++) { const c = s.itens.filter(i => i.dia === d && !EXTRAS.includes(i.categoria)); if (c.length && !c.every(i => this.d.feitos.has(i.id))) return d }
